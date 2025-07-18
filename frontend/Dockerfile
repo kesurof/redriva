@@ -9,6 +9,7 @@ COPY vite.config.js ./
 COPY tailwind.config.cjs ./
 ENV PATH="./node_modules/.bin:$PATH"
 RUN npm install
+RUN npx svelte-kit --version && npx svelte-kit --help
 RUN npm run build
 
 # Étape de déploiement
