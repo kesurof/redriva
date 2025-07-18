@@ -23,7 +23,50 @@ Redriva est une application web complète pour gérer, visualiser et automatiser
 - `data/` : base de données et données persistantes
 - `systemd/` : fichiers d’unités systemd (déploiement classique)
 
-## Déploiement rapide (Docker Compose recommandé)
+
+## Procédure post-build Docker (serveur de test)
+
+Après avoir build les images Docker, suivez ces étapes pour lancer et vérifier Redriva :
+
+### 1. Configurer les variables d’environnement
+- Vérifiez que le fichier `config/.env` contient bien la variable `RD_TOKEN` (token Real-Debrid) côté backend.
+- Vérifiez les autres variables nécessaires (chemins, options spécifiques).
+
+### 2. Lancer les services
+Dans le dossier du projet :
+```sh
+docker compose up -d
+```
+Cela démarre les services backend et frontend en mode détaché.
+
+### 3. Vérifier l’état des services
+```sh
+docker compose ps
+```
+Les deux services doivent être en statut `running` ou `healthy`.
+
+### 4. Accéder à l’application
+- **Frontend** : [http://localhost:4173](http://localhost:4173) (ou l’IP/nom du serveur si distant)
+- **Backend (API)** : [http://localhost:8000/api/ping](http://localhost:8000/api/ping)
+
+### 5. Logs et débogage
+Pour consulter les logs en temps réel :
+```sh
+docker compose logs -f
+```
+
+### 6. Arrêter les services
+Pour arrêter proprement :
+```sh
+docker compose down
+```
+
+### 7. Checklist post-déploiement
+- Vérifiez que l’interface frontend s’affiche et communique bien avec le backend.
+- Testez une action clé (connexion, affichage des torrents, etc.).
+- Contrôlez les logs pour détecter d’éventuelles erreurs ou warnings.
+
+---
 
 ### Prérequis
 - Docker et Docker Compose installés
