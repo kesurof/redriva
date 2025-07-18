@@ -4,5 +4,19 @@
   "delete": "Delete",
   "details": "Details",
   "loading": "Loading...",
-  "no_data": "No data available"
+  "no_data": "No data available",
+  "downloads": "Downloads",
+  "scraper": "Scraper",
+  "settings": "Settings",
+  "confirm_delete": "Confirm deletion?",
+  "success_add": "Added successfully!",
+  "success_delete": "Deleted successfully!",
+  "error": "Error",
+  "close": "Close",
+  "actions": "Actions",
+  "filename": "Filename",
+  "status": "Status",
+  "size": "Size",
+  "added": "Added",
+  "links": "Links"
 }

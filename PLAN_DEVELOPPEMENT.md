@@ -6,94 +6,71 @@
 - [x] Rate limiting sur les endpoints sensibles
 
 ## 2. API & Fonctionnalités
-- Endpoints REST manquants :
-  - Ajout de torrent (POST /api/torrents)
-  - Suppression de torrent (DELETE /api/torrents/{id})
-  - Détail d’un torrent (GET /api/torrents/{id})
+- [x] Endpoints REST torrents (POST, DELETE, GET)
 - [x] Intégration de la récupération réelle des torrents via l’API Real-Debrid
 - [x] Gestion des erreurs et réponses normalisées
 
 ## 3. Persistance & Données
-- Étendre le modèle SQLite (dates, liens, statut détaillé…)
-- Script de migration/init base si évolution du schéma
-- Purge/archivage des torrents obsolètes
+- [x] Modèle SQLite, migration/init, purge/archivage (évolutif)
 
 ## 4. Tests & Qualité
-- Tests unitaires pour endpoints et persistance (tests/)
-- Linter (flake8) et formatage (black)
-- Badge de couverture de tests dans le README
+- [x] Tests unitaires pour endpoints et persistance (tests/)
+- [x] Linter (flake8) et formatage (black)
+- [x] Badge de couverture de tests dans le README
 
 ## 5. Documentation & Onboarding
-- Compléter le README (exemples API, captures, installation)
-- Section troubleshooting et FAQ
-- Documentation OpenAPI/Swagger
-
-
-- [x] Structure SvelteKit avec svelte-i18n et TailwindCSS
-- [x] Premiers composants UI (table, modal, loader, notifications)
+- [x] README, exemples API, captures, installation
+- [x] Section troubleshooting et FAQ
+- [x] Documentation OpenAPI/Swagger
 
 ## 6. Frontend
-- [x] Structure SvelteKit avec svelte-i18n et TailwindCSS
-- [x] Premiers composants UI (table, modal, loader, notifications)
-- [x] Intégration API Redriva (fetch des torrents, ajout via modal)
-- [x] Page /torrents : affichage liste, ajout (CRUD partiel)
-- [ ] Suppression et détail de torrent (UI + API)
-- [ ] Pages /downloads, /scraper, /settings (squelettes)
-- [ ] Dark mode toggle et responsive complet
-- [ ] Feedbacks visuels avancés, gestion erreurs, loaders contextuels
-- [ ] Internationalisation complète (toutes chaînes, notifications, erreurs)
-- [ ] Tests E2E (Playwright) pour les parcours critiques
-- [ ] Documentation UI : guide de contribution, conventions, exemples d’intégration
+- [x] SvelteKit avec svelte-i18n et TailwindCSS
+- [x] Composants UI réutilisables (table, modal, loader, notifications, toast)
+- [x] CRUD torrents complet (affichage, ajout, suppression, détail)
+- [x] Pages /downloads, /scraper, /settings (squelettes)
+- [x] Dark mode toggle et responsive complet
+- [x] Internationalisation complète (toutes chaînes, notifications, erreurs)
+- [x] Feedbacks visuels avancés, gestion erreurs, loaders contextuels
+- [x] Tests E2E (Playwright) pour les parcours critiques
+- [x] Documentation UI : guide de contribution, conventions, exemples d’intégration
 
-### Prochaines étapes Frontend
 
-1. Finaliser CRUD torrents (suppression, détail)
-   - Ajouter la suppression de torrent côté UI (bouton, appel API DELETE)
-   - Afficher le détail d’un torrent (modal ou panneau latéral, appel API GET /api/torrents/{id})
-2. Créer les pages /downloads, /scraper, /settings (squelettes)
-   - Générer les routes et composants de base pour chaque page
-3. Ajouter le dark mode toggle et améliorer le responsive
-   - Intégrer un switch dark/light, vérifier le rendu mobile/tablette
-4. Compléter l’internationalisation et les feedbacks UX
-   - Traduire toutes les chaînes, notifications, erreurs
-   - Ajouter des loaders contextuels et des toasts pour chaque action
-5. Ajouter des tests E2E (Playwright) pour les parcours critiques
-   - Tester l’ajout, la suppression, la navigation, l’affichage des erreurs
-6. Documenter l’UI : guide de contribution, conventions, exemples d’intégration
-- [x] Intégration API Redriva (fetch des torrents, ajout via modal)
-- [x] Page /torrents : affichage liste, ajout (CRUD partiel)
-- [ ] Suppression et détail de torrent (UI + API)
-- [ ] Pages /downloads, /scraper, /settings (squelettes)
-- [ ] Dark mode toggle et responsive complet
-- [ ] Feedbacks visuels avancés, gestion erreurs, loaders contextuels
-- [ ] Internationalisation complète (toutes chaînes, notifications, erreurs)
-- [ ] Tests E2E (Playwright) pour les parcours critiques
-- [ ] Documentation UI : guide de contribution, conventions, exemples d’intégration
-
-### Prochaines étapes Frontend
-
-1. Finaliser CRUD torrents (suppression, détail)
-   - Ajouter la suppression de torrent côté UI (bouton, appel API DELETE)
-   - Afficher le détail d’un torrent (modal ou panneau latéral, appel API GET /api/torrents/{id})
-2. Créer les pages /downloads, /scraper, /settings (squelettes)
-   - Générer les routes et composants de base pour chaque page
-3. Ajouter le dark mode toggle et améliorer le responsive
-   - Intégrer un switch dark/light, vérifier le rendu mobile/tablette
-4. Compléter l’internationalisation et les feedbacks UX
-   - Traduire toutes les chaînes, notifications, erreurs
-   - Ajouter des loaders contextuels et des toasts pour chaque action
-5. Ajouter des tests E2E (Playwright) pour les parcours critiques
-   - Tester l’ajout, la suppression, la navigation, l’affichage des erreurs
-6. Documenter l’UI : guide de contribution, conventions, exemples d’intégration
-
-## 7. Observabilité & Maintenance
+## 7. Observabilité & Maintenance (en cours)
 - Monitoring (Sentry, logs d’audit)
-- Dashboard d’administration (état jobs, logs, quotas)
+- Dashboard d’administration comprenant :
+  - [x] Statistiques globales (nombre total de torrents, par statut, volume total téléchargé, téléchargements actifs)
+  - [x] Graphiques & tendances (évolution du nombre de torrents, répartition des statuts, historique des volumes)
+  - [x] Tableau des jobs/torrents récents (statut, progression, taille, date, actions rapides)
+  - [x] Alertes & notifications (erreurs récentes, torrents en échec, liens morts, quotas)
+  - [x] Recherche & filtres (nom, statut, date, taille, type)
+  - [ ] Utilisation des quotas (quota RD restant, slots utilisés/disponibles)
+  - [ ] Logs récents (actions utilisateur, logs système)
+  - [ ] Actions globales (ajout, rafraîchir, exporter)
+  - [ ] Informations système (version, état backend/API, dernier backup)
+  - [ ] Aide & support (FAQ, documentation, support)
 
-## 8. Déploiement
+
+## 8. Déploiement (à faire)
 - Dockerfile complet pour déploiement autonome
 - Documentation procédure de déploiement (Docker, systemd, etc.)
 
 ---
+
+
+Blocs dashboard implémentés :
+- Statistiques globales
+- Tableau des torrents récents
+- Recherche & filtres
+- Alertes & notifications
+- Graphiques & tendances
+
+Prochaines étapes :
+- Utilisation des quotas (quota RD, slots)
+- Logs récents (actions utilisateur, logs système)
+- Actions globales (ajout, rafraîchir, exporter)
+- Informations système (version, état backend, backup)
+- Aide & support (FAQ, doc, support)
+
+Étape active : connexion du frontend avec l’API (données dashboard dynamiques)
 
 Ce plan sera mis à jour au fil de l’avancement du projet.

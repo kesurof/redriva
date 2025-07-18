@@ -4,5 +4,19 @@
   "delete": "Supprimer",
   "details": "Détails",
   "loading": "Chargement...",
-  "no_data": "Aucune donnée disponible"
+  "no_data": "Aucune donnée disponible",
+  "downloads": "Téléchargements",
+  "scraper": "Scraper",
+  "settings": "Paramètres",
+  "confirm_delete": "Confirmer la suppression ?",
+  "success_add": "Ajout réussi !",
+  "success_delete": "Suppression réussie !",
+  "error": "Erreur",
+  "close": "Fermer",
+  "actions": "Actions",
+  "filename": "Nom du fichier",
+  "status": "Statut",
+  "size": "Taille",
+  "added": "Ajouté",
+  "links": "Liens"
 }
