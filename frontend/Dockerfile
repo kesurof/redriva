@@ -5,6 +5,7 @@ WORKDIR /app
 COPY package.json package-lock.json* ./
 COPY src ./src
 COPY tailwind.config.cjs ./
+COPY index.html ./
 RUN npm install && npm run build
 
 # Étape de déploiement
