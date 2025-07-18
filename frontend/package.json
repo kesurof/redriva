@@ -16,7 +16,8 @@
   },
   "devDependencies": {
     "vite": "^5.0.0",
-    "@sveltejs/vite-plugin-svelte": "^4.0.0-next.6"
+    "@sveltejs/vite-plugin-svelte": "^4.0.0-next.6",
+    "@sveltejs/adapter-static": "^3.3.1"
   },
   "overrides": {
     "@sveltejs/vite-plugin-svelte": "^4.0.0-next.6"
