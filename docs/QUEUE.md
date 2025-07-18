@@ -1,7 +1,7 @@
 # File d’attente et gestion des priorités Redriva
 
-## Fonctionnalité
-Permet de gérer l’ordre de traitement des torrents (priorité, statut), de limiter le nombre de téléchargements simultanés et de suivre l’avancement de chaque job.
+## Principe
+Gérez l’ordre de traitement des torrents (priorité, statut), limitez le nombre de téléchargements simultanés et suivez l’avancement de chaque job via une file d’attente centralisée.
 
 ## Backend
 - Table SQLite `queue` : id, torrent_id, priority, status, added_at, updated_at
@@ -14,12 +14,17 @@ Permet de gérer l’ordre de traitement des torrents (priorité, statut), de li
 
 ## Frontend
 - Page `/queue` :
-  - Affiche la file d’attente (table)
+  - Affiche la file d’attente (table interactive)
   - Ajout d’un torrent par ID
   - Modification de la priorité (▲/▼)
   - Suppression d’un job
-  - Rafraîchissement automatique toutes les 5 s
-- Feedbacks visuels (chargement, erreurs)
+  - Rafraîchissement automatique toutes les 5 s (polling)
+- Feedbacks visuels (chargement, erreurs, notifications)
+
+## Déploiement & maintenance
+- Fonctionne en local, Docker Compose ou cloud (voir `docs/DEPLOIEMENT.md`)
+- Les logs et l’état de la file sont persistés (`logs/`, `data/`)
+- Pour debug : consultez les logs, vérifiez la connectivité API RD, utilisez les endpoints REST
 
 ## Cas d’usage
 - Prioriser un téléchargement urgent
@@ -45,6 +50,10 @@ curl -X PATCH -H "Content-Type: application/json" -d '{"priority": 1}' http://lo
 curl -X DELETE http://localhost:8000/api/queue/1
 ```
 
+## Sécurité
+- Le token Real-Debrid n’est jamais exposé côté client
+- Les accès API sont protégés côté backend (rate limiting, logs)
+
 ## FAQ
 - **Comment voir la file ?**
   - Aller sur la page « File d’attente » du frontend
@@ -55,4 +64,4 @@ curl -X DELETE http://localhost:8000/api/queue/1
 
 ---
 
-Pour toute question, voir la documentation principale ou ouvrir une issue sur GitHub.
+Pour toute question, voir la documentation principale (`docs/`), la FAQ ou ouvrir une issue sur GitHub.
