@@ -1,6 +1,7 @@
 version: "3.8"
 services:
   backend:
+    container_name: redriva-backend
     build: ./backend
     env_file:
       - ./config/.env
@@ -11,11 +12,30 @@ services:
       - "8000:8000"
     environment:
       - RD_TOKEN=${RD_TOKEN}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    labels:
+      - "com.redriva.service=backend"
+
   frontend:
+    container_name: redriva-frontend
     build: ./frontend
     ports:
-      - "5173:5173"
+      - "4173:4173"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     environment:
       - VITE_API_URL=http://backend:8000
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4173"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    labels:
+      - "com.redriva.service=frontend"

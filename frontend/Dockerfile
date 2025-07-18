@@ -3,17 +3,16 @@ WORKDIR /app
 
 # Copie des fichiers nécessaires
 COPY package.json ./
+COPY package-lock.json ./
 COPY src ./src
 COPY svelte.config.js ./
 COPY vite.config.js ./
 COPY tailwind.config.cjs ./
 
-
 # Environnement Vite/SvelteKit moderne
 ENV PATH="./node_modules/.bin:$PATH"
 RUN npm install
 RUN npm run build
-
 
 # Utilisation du preview natif SvelteKit (adapter-auto)
 FROM node:20-alpine
