@@ -1,0 +1,2 @@
+# Ce fichier permet de versionner le dossier logs/ (logs applicatifs persistants).
+# Ne pas supprimer. Les fichiers de logs réels ne sont jamais commités.
