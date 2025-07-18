@@ -50,11 +50,21 @@
   - [x] Aide & support (FAQ, documentation, support)
 
 
-## 8. Déploiement (à faire)
+
+## 8. Gestion des priorités & files d’attente (fait)
+- [x] Modèle de file d’attente côté backend (table queue : id, torrent_id, priority, status, added_at, updated_at)
+- [x] Endpoints API REST pour la file/priorités (GET/POST/PATCH/DELETE /api/queue)
+- [x] Logique backend : gestion de l’ordre d’exécution, N téléchargements simultanés, priorités dynamiques (queue_worker.py)
+- [x] Frontend : page « File d’attente » (table, ajout, actions ↑↓, suppression, feedbacks visuels)
+- [x] Synchronisation automatique (polling)
+- [x] Documentation d’usage et cas d’erreur (docs/QUEUE.md)
+
+## 9. Déploiement (à faire)
 - Dockerfile complet pour déploiement autonome
 - Documentation procédure de déploiement (Docker, systemd, etc.)
 
 ---
+
 
 
 
@@ -68,6 +78,15 @@ Blocs dashboard implémentés :
 - Logs récents (actions utilisateur, logs système)
 - Actions globales (ajout, rafraîchir, exporter)
 - Informations système (version, état backend, backup)
+- Aide & support (FAQ, documentation, support)
+- File d’attente & priorités (table, actions, polling)
+
+Tous les blocs du dashboard Redriva sont dynamiques, connectés à l’API backend et finalisés.
+
+La partie Observabilité & Maintenance est terminée.
+
+Prochaine étape :
+- Déploiement (Dockerfile, documentation procédure Docker/systemd)
 
 
 Tous les blocs du dashboard Redriva sont dynamiques, connectés à l’API backend et finalisés.
