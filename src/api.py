@@ -2,15 +2,15 @@
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from fastapi import Request, Body, Path
-from .services import fetch_torrents, add_torrent_rd, delete_torrent_rd, get_torrent_detail_rd
+from services import fetch_torrents, add_torrent_rd, delete_torrent_rd, get_torrent_detail_rd
 
 # API FastAPI minimal pour Redriva
 from fastapi import FastAPI, Request, Body, Path
 from fastapi.responses import JSONResponse
-from .services import fetch_torrents
-from . import persistence
-from .logging_utils import log_info, log_error, log_access
-from .ratelimit_utils import rate_limited
+from services import fetch_torrents
+import persistence
+from logging_utils import log_info, log_error, log_access
+from ratelimit_utils import rate_limited
 
 app = FastAPI()
 
