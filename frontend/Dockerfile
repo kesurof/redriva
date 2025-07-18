@@ -1,12 +1,13 @@
 FROM node:20-alpine AS build
 WORKDIR /app
-COPY package.json package-lock.json* ./
+COPY package.json ./
 COPY src ./src
 COPY svelte.config.js ./
 COPY vite.config.js ./
 COPY tailwind.config.cjs ./
 ENV PATH="./node_modules/.bin:$PATH"
 RUN npm install
+RUN npx vite --version
 RUN npm run build
 
 FROM node:20-alpine
