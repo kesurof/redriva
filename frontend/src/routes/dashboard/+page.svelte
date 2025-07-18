@@ -394,8 +394,8 @@
     <input type="date" class="border rounded px-2 py-1" bind:value={date} />
   </div>
   <div>
-    <label class="block text-xs mb-1">{ $t('size') || 'Taille min (Mo)' }</label>
-    <input type="number" class="border rounded px-2 py-1" min="0" bind:value={size} />
+    <label for="size-input" class="block text-xs mb-1">{ $t('size') || 'Taille min (Mo)' }</label>
+    <input id="size-input" type="number" class="border rounded px-2 py-1" min="0" bind:value={size} />
   </div>
   <button class="bg-blue-600 text-white px-4 py-2 rounded" on:click={() => { /* à brancher */ }}>{ $t('filter') || 'Filtrer' }</button>
 </div>

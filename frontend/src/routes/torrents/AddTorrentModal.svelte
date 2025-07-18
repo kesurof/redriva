@@ -2,6 +2,7 @@
   import { createEventDispatcher } from 'svelte';
   import Modal from '$lib/components/ui/Modal.svelte';
   import { t } from 'svelte-i18n';
+  import { apiUrl } from '$lib/api.js';
   let magnet = '';
   let loading = false;
   let error = '';
@@ -13,7 +14,6 @@
     loading = true;
     error = '';
     try {
-      import { apiUrl } from '$lib/api.js';
       const res = await fetch(apiUrl('/api/torrents'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
