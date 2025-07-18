@@ -229,6 +229,10 @@
     if (updateStatusInterval) clearInterval(updateStatusInterval);
     if (updateLogInterval) clearInterval(updateLogInterval);
   });
+// ...fin du <script>
+
+</script>
+
 <h2 class="text-xl font-semibold mb-2 mt-8">{ $t('support') || 'Aide & support' }</h2>
 <div class="bg-white dark:bg-gray-800 rounded shadow p-4 mb-8">
   <div class="mb-2 font-bold">FAQ</div>
