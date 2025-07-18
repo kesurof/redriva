@@ -110,4 +110,16 @@ Redriva est une application web complète pour gérer, visualiser et automatiser
 - Ouvrez une issue pour toute question ou bug
 
 ---
+
+## 📚 Documentation
+
+- [Guide d'installation](docs/INSTALL.md)
+- [Guide d'utilisation](docs/USAGE.md)
+- [Contribution](docs/CONTRIBUTING.md)
+- [Dépannage](docs/TROUBLESHOOTING.md)
+- [Déploiement](docs/DEPLOIEMENT.md)
+
+Pour toute question, consultez la documentation dans le dossier `docs/` ou ouvrez une issue.
+
+---
 **Sécurité : ne commitez jamais de secrets ou de tokens dans le dépôt.**

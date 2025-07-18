@@ -15,7 +15,7 @@ from .ratelimit_utils import rate_limited
 app = FastAPI()
 
 @app.get("/api/ping")
-def ping():
+async def ping():
     log_access("/api/ping")
     return {"success": True, "message": "pong"}
 
@@ -25,7 +25,7 @@ async def get_torrents(request: Request):
     log_access("/api/torrents")
     try:
         torrents = await fetch_torrents()
-        persistence.save_torrents(torrents)
+        await persistence.save_torrents(torrents)
         log_info(f"Torrents récupérés et stockés: {len(torrents)}")
         return JSONResponse(content={"success": True, "data": torrents, "error": None})
     except Exception as e:
@@ -34,10 +34,10 @@ async def get_torrents(request: Request):
 
 @app.get("/api/torrents/local")
 @rate_limited("/api/torrents/local")
-def get_local_torrents(request: Request):
+async def get_local_torrents(request: Request):
     log_access("/api/torrents/local")
     try:
-        torrents = persistence.get_all_torrents()
+        torrents = await persistence.get_all_torrents()
         return JSONResponse(content={"success": True, "data": torrents, "error": None})
     except Exception as e:
         log_error(f"Erreur /api/torrents/local: {e}")
