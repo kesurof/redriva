@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Modal from '$lib/components/ui/Modal.svelte';
   let syncStatus = '';
   let syncRunning = false;
   let showSyncToast = false;
@@ -361,9 +362,8 @@
       {/each}
     {/if}
   </ul>
+
 </div>
-import Modal from '$lib/components/ui/Modal.svelte';
-</script>
 
 <h1 class="text-2xl font-bold mb-6">{ $t('dashboard') || 'Dashboard' }</h1>
 
