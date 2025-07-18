@@ -1,0 +1,16 @@
+{
+  "name": "redriva",
+  "description": "Gestionnaire Real-Debrid moderne, sécurisé, évolutif.",
+  "version": "0.1.0",
+  "author": "${USER}",
+  "license": "GPL-3.0",
+  "main": "src/index.js",
+  "backend": "backend/app.py",
+  "scripts": {
+    "start": "python3 ../backend/app.py",
+    "dev": "vite dev",
+    "test": "pytest ../tests"
+  },
+  "dependencies": [],
+  "devDependencies": []
+}

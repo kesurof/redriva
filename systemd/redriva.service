@@ -1,0 +1,19 @@
+# Unité systemd pour Redriva (mode utilisateur)
+# À installer manuellement avec :
+# systemctl --user enable redriva.service
+# systemctl --user start redriva.service
+
+[Unit]
+Description=Service Real-Debrid Manager (Redriva)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/${USER}/scripts/rdm/redriva/
+ExecStart=/home/${USER}/scripts/rdm/redriva/scripts/start.sh
+ExecStop=/home/${USER}/scripts/rdm/redriva/scripts/stop.sh
+Restart=on-failure
+User=%u
+
+[Install]
+WantedBy=default.target
