@@ -2,7 +2,9 @@
 services:
   backend:
     container_name: redriva-backend
-    build: ./backend
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
     env_file:
       - ./config/.env
     volumes:
