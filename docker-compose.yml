@@ -5,8 +5,8 @@ services:
     build:
       context: .
       dockerfile: backend/Dockerfile
-    env_file:
-      - ./config/.env
+    environment:
+      - RD_TOKEN=VOTRE_TOKEN_RD_ICI
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
