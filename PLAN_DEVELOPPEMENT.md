@@ -65,33 +65,6 @@
 
 ---
 
-
-
-
-Blocs dashboard implémentés :
-- Statistiques globales
-- Tableau des torrents récents
-- Recherche & filtres
-- Alertes & notifications
-- Graphiques & tendances
-- Utilisation des quotas (quota RD, slots)
-- Logs récents (actions utilisateur, logs système)
-- Actions globales (ajout, rafraîchir, exporter)
-- Informations système (version, état backend, backup)
-- Aide & support (FAQ, documentation, support)
-- File d’attente & priorités (table, actions, polling)
-
-Tous les blocs du dashboard Redriva sont dynamiques, connectés à l’API backend et finalisés.
-
-La partie Observabilité & Maintenance est terminée.
-
 Prochaine étape :
 - Déploiement (Dockerfile, documentation procédure Docker/systemd)
 
-
-Tous les blocs du dashboard Redriva sont dynamiques, connectés à l’API backend et finalisés.
-
-Prochaine étape :
-- Déploiement (Dockerfile, documentation procédure Docker/systemd)
-
-Ce plan sera mis à jour au fil de l’avancement du projet.
