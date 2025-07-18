@@ -377,12 +377,12 @@
 <!-- Filtres -->
 <div class="flex flex-wrap gap-4 mb-6 items-end">
   <div>
-    <label class="block text-xs mb-1">{ $t('search') || 'Recherche' }</label>
-    <input class="border rounded px-2 py-1" placeholder="Nom..." bind:value={search} />
+    <label for="search-input" class="block text-xs mb-1">{ $t('search') || 'Recherche' }</label>
+    <input id="search-input" class="border rounded px-2 py-1" placeholder="Nom..." bind:value={search} />
   </div>
   <div>
-    <label class="block text-xs mb-1">{ $t('status') || 'Statut' }</label>
-    <select class="border rounded px-2 py-1" bind:value={status}>
+    <label for="status-select" class="block text-xs mb-1">{ $t('status') || 'Statut' }</label>
+    <select id="status-select" class="border rounded px-2 py-1" bind:value={status}>
       <option value="">{ $t('all') || 'Tous' }</option>
       <option value="active">{ $t('active') || 'Actif' }</option>
       <option value="completed">{ $t('completed') || 'Terminé' }</option>
