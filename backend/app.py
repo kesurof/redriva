@@ -11,7 +11,7 @@ from typing import Optional
 
 # Importe la persistance asynchrone
 import sys
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../src')))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), 'src')))
 from persistence import init_db, save_torrents, get_all_torrents, init_queue_table, get_all_queue, add_to_queue as persist_add_to_queue, update_queue as persist_update_queue, delete_queue as persist_delete_queue
 
 
