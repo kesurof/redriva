@@ -93,3 +93,27 @@
 
 Le projet est prêt pour un déploiement automatisé, sécurisé et reproductible.
 
+5. Points critiques, dette technique, failles, limitations
+Endpoints critiques : sync et update bien séparés, mais la logique de scraping et de bulk actions reste à fiabiliser
+Sécurité : bonne gestion du token, mais pas d’audit automatisé des dépendances, ni de tests d’intrusion
+Documentation : très bonne base, mais la documentation API (OpenAPI) et la FAQ pourraient être enrichies
+Dépendances : pas de vérification automatique des vulnérabilités (Snyk, pip-audit)
+Tests : couverture à renforcer côté backend, pas de tests de montée en charge
+Code : globalement idiomatique, mais quelques duplications (gestion des états sync/update), et certains scripts utilitaires pourraient être factorisés
+Internationalisation : bien prévue, mais certains messages restent hardcodés
+CI/CD : pipeline à compléter pour automatiser lint, test, build, release
+Accessibilité : dark mode, responsive, navigation clavier, mais à tester avec lecteurs d’écran
+
+6. Recommandations et modernisations
+Renforcer la couverture de tests backend (sync, update, queue, sécurité)
+Automatiser l’audit des dépendances (Snyk, pip-audit, npm audit)
+Compléter la documentation API (OpenAPI/Swagger, exemples d’appels)
+Factoriser la gestion des états sync/update (DRY)
+Ajouter un monitoring (Sentry, dashboards admin)
+Prévoir l’extension multi-utilisateurs et multi-services
+Automatiser la CI/CD (lint, test, build, release, badge coverage)
+Ajouter des tests de charge et de robustesse
+Renforcer l’accessibilité (tests réels, WCAG)
+Documenter la stratégie de release et de migration
+Prévoir des scripts de migration et de backup automatisés
+Moderniser le frontend si besoin (SvelteKit v2, etc.)
