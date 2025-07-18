@@ -1,11 +1,4 @@
-
-// Sélection dynamique de l'adapter : static si dispo, sinon auto
-let adapter;
-try {
-  adapter = require('@sveltejs/adapter-static');
-} catch (e) {
-  adapter = require('@sveltejs/adapter-auto');
-}
+import adapter from '@sveltejs/adapter-static';
 
 /** @type {import('@sveltejs/kit').Config} */
 
