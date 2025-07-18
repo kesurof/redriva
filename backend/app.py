@@ -6,14 +6,20 @@ from typing import Optional
 import aiohttp
 import asyncio
 from fastapi import FastAPI, Request, BackgroundTasks, Body
+from pydantic import BaseModel
+import aiosqlite
 from fastapi.responses import JSONResponse
 
 app = FastAPI()
 
 DB_PATH = "data/redriva.db"
 
-def get_db():
-    return sqlite3.connect(DB_PATH)
+
+# Nouveau schéma Pydantic pour la file d'attente
+class QueueItem(BaseModel):
+    torrent_id: str
+    priority: int = 10
+    status: str = "pending"
 
 # --- Fonctions utilitaires pour la synchronisation globale (analogue à update) ---
 def is_sync_running():
@@ -227,32 +233,32 @@ def get_db():
     return sqlite3.connect(DB_PATH)
 
 @app.get("/api/queue")
-def get_queue():
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute("SELECT id, torrent_id, priority, status, added_at, updated_at FROM queue ORDER BY priority ASC, added_at ASC")
-    rows = cur.fetchall()
-    conn.close()
-    return [{
-        "id": row[0],
-        "torrent_id": row[1],
-        "priority": row[2],
-        "status": row[3],
-        "added_at": row[4],
-        "updated_at": row[5]
-    } for row in rows]
+async def get_queue():
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("SELECT id, torrent_id, priority, status, added_at, updated_at FROM queue ORDER BY priority ASC, added_at ASC") as cursor:
+            rows = await cursor.fetchall()
+        return [
+            {
+                "id": row["id"],
+                "torrent_id": row["torrent_id"],
+                "priority": row["priority"],
+                "status": row["status"],
+                "added_at": row["added_at"],
+                "updated_at": row["updated_at"]
+            }
+            for row in rows
+        ]
 
 @app.post("/api/queue")
-def add_to_queue(item: dict):
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute(
-        "INSERT INTO queue (torrent_id, priority, status) VALUES (?, ?, ?)",
-        (item.get("torrent_id"), item.get("priority", 10), item.get("status", "pending"))
-    )
-    conn.commit()
-    queue_id = cur.lastrowid
-    conn.close()
+async def add_to_queue(item: QueueItem):
+    async with aiosqlite.connect(DB_PATH) as db:
+        cursor = await db.execute(
+            "INSERT INTO queue (torrent_id, priority, status) VALUES (?, ?, ?)",
+            (item.torrent_id, item.priority, item.status)
+        )
+        await db.commit()
+        queue_id = cursor.lastrowid
     return {"id": queue_id}
 
 @app.patch("/api/queue/{queue_id}")

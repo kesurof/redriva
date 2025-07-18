@@ -1,4 +1,6 @@
 fastapi
 uvicorn[standard]
 aiohttp
+aiosqlite
+pydantic
 python-dotenv
