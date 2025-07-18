@@ -1,4 +1,160 @@
 <script lang="ts">
+  let syncStatus = '';
+  let syncRunning = false;
+  let showSyncToast = false;
+  let syncStatusInterval: any = null;
+  let syncProgress = { done: 0, total: 0 };
+  let showSyncLogModal = false;
+  let syncLog = [];
+  let syncLogInterval: any = null;
+
+  // Pour la mise à jour détails torrents
+  let updateStatus = '';
+  let updateRunning = false;
+  let updateProgress = { done: 0, total: 0 };
+  let showUpdateLogModal = false;
+  let updateLog = [];
+  let updateStatusInterval: any = null;
+  let updateLogInterval: any = null;
+
+  async function fetchUpdateStatus() {
+    try {
+      const res = await fetch(apiUrl('/api/admin/update-torrents-status'));
+      if (res.ok) {
+        const data = await res.json();
+        updateRunning = data.running;
+        updateStatus = data.status;
+        updateProgress = data.progress || { done: 0, total: 0 };
+      }
+    } catch (e) {
+      updateStatus = 'Erreur de statut';
+      updateRunning = false;
+      updateProgress = { done: 0, total: 0 };
+    }
+  }
+
+  async function fetchUpdateLog() {
+    try {
+      const res = await fetch(apiUrl('/api/admin/update-torrents-log'));
+      if (res.ok) {
+        const data = await res.json();
+        updateLog = data.log || [];
+      }
+    } catch (e) {
+      updateLog = ['Erreur de lecture des logs'];
+    }
+  }
+
+  let updateRateLimit = 60;
+  // Persistance du rate limit dans localStorage
+  const UPDATE_RATE_LIMIT_KEY = 'redriva_update_rate_limit';
+  // Charger la valeur sauvegardée si présente
+  if (typeof window !== 'undefined') {
+    const saved = localStorage.getItem(UPDATE_RATE_LIMIT_KEY);
+    if (saved && !isNaN(Number(saved))) {
+      updateRateLimit = Number(saved);
+    }
+  }
+
+  $: if (typeof window !== 'undefined') {
+    // Sauvegarder la nouvelle valeur si elle change
+    localStorage.setItem(UPDATE_RATE_LIMIT_KEY, String(updateRateLimit));
+  }
+  async function launchUpdate() {
+    await fetchUpdateStatus();
+    if (updateRunning) {
+      updateStatus = 'Mise à jour déjà en cours';
+      showUpdateLogModal = true;
+      await fetchUpdateLog();
+      return;
+    }
+    updateStatus = '';
+    try {
+      const res = await fetch(apiUrl('/api/admin/update-torrents'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rate_limit: updateRateLimit })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.status === 'already_running') {
+          updateStatus = 'Mise à jour déjà en cours';
+        } else {
+          updateStatus = 'Mise à jour lancée';
+        }
+      } else {
+        updateStatus = 'Erreur lors du lancement';
+      }
+    } catch (e) {
+      updateStatus = 'Erreur réseau';
+    }
+    showUpdateLogModal = true;
+    await fetchUpdateStatus();
+    await fetchUpdateLog();
+  }
+
+  async function fetchSyncStatus() {
+    try {
+      const res = await fetch(apiUrl('/api/admin/sync-status'));
+      if (res.ok) {
+        const data = await res.json();
+        syncRunning = data.running;
+        syncStatus = data.status;
+        syncProgress = data.progress || { done: 0, total: 0 };
+      }
+    } catch (e) {
+      syncStatus = 'Erreur de statut';
+      syncRunning = false;
+      syncProgress = { done: 0, total: 0 };
+    }
+  }
+
+  async function fetchSyncLog() {
+    try {
+      const res = await fetch(apiUrl('/api/admin/sync-log'));
+      if (res.ok) {
+        const data = await res.json();
+        syncLog = data.log || [];
+      }
+    } catch (e) {
+      syncLog = ['Erreur de lecture des logs'];
+    }
+  }
+
+  async function launchSync() {
+    await fetchSyncStatus();
+    if (syncRunning) {
+      syncStatus = 'Synchronisation déjà en cours';
+      showSyncToast = true;
+      setTimeout(() => { showSyncToast = false; }, 4000);
+      return;
+    }
+    syncStatus = '';
+    showSyncToast = false;
+    try {
+      const res = await fetch(apiUrl('/api/admin/sync'), { method: 'POST' });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.status === 'already_running') {
+          syncStatus = 'Synchronisation déjà en cours';
+        } else {
+          syncStatus = 'Synchronisation lancée';
+        }
+      } else {
+        syncStatus = 'Erreur lors du lancement';
+      }
+    } catch (e) {
+      syncStatus = 'Erreur réseau';
+    }
+    showSyncToast = true;
+    setTimeout(() => { showSyncToast = false; }, 4000);
+    await fetchSyncStatus();
+    // Ouvre la popup log dès le lancement
+    showSyncLogModal = true;
+    await fetchSyncLog();
+  }
+
+  import { onMount, onDestroy } from 'svelte';
   import { t } from 'svelte-i18n';
   import { apiUrl } from '$lib/api.js';
   let stats = { total: 0, actifs: 0, termines: 0, erreurs: 0, volume: 0 };
@@ -23,10 +179,18 @@
   // Support dynamique
   let support = { faq: [], links: [] };
 
-  import { onMount } from 'svelte';
-
-  // Récupération des quotas et logs à l'initialisation
+  // Récupération des quotas, logs, sync status à l'initialisation
   onMount(async () => {
+    await fetchSyncStatus();
+    await fetchUpdateStatus();
+    syncStatusInterval = setInterval(fetchSyncStatus, 2000);
+    syncLogInterval = setInterval(() => {
+      if (showSyncLogModal || syncRunning) fetchSyncLog();
+    }, 2000);
+    updateStatusInterval = setInterval(fetchUpdateStatus, 2000);
+    updateLogInterval = setInterval(() => {
+      if (showUpdateLogModal || updateRunning) fetchUpdateLog();
+    }, 2000);
     try {
       const res = await fetch(apiUrl('/api/quotas'));
       if (res.ok) {
@@ -58,6 +222,13 @@
       }
     } catch (e) {}
   });
+
+  onDestroy(() => {
+    if (syncStatusInterval) clearInterval(syncStatusInterval);
+    if (syncLogInterval) clearInterval(syncLogInterval);
+    if (updateStatusInterval) clearInterval(updateStatusInterval);
+    if (updateLogInterval) clearInterval(updateLogInterval);
+  });
 <h2 class="text-xl font-semibold mb-2 mt-8">{ $t('support') || 'Aide & support' }</h2>
 <div class="bg-white dark:bg-gray-800 rounded shadow p-4 mb-8">
   <div class="mb-2 font-bold">FAQ</div>
@@ -86,6 +257,81 @@
   <button class="bg-green-600 text-white px-4 py-2 rounded">{ $t('add') || 'Ajouter' }</button>
   <button class="bg-blue-600 text-white px-4 py-2 rounded">{ $t('refresh') || 'Rafraîchir' }</button>
   <button class="bg-gray-600 text-white px-4 py-2 rounded">{ $t('export') || 'Exporter' }</button>
+  <button class="bg-orange-600 text-white px-4 py-2 rounded" on:click={launchSync} disabled={syncRunning}>
+    {syncRunning ? ($t('sync_in_progress') || 'Synchronisation en cours...') : ($t('sync_rd') || 'Synchroniser RD → SQLite')}
+  </button>
+  <button class="bg-gray-700 text-white px-4 py-2 rounded" on:click={() => { showSyncLogModal = true; fetchSyncLog(); }}>
+    Voir logs synchro
+  </button>
+  <input type="number" min="5" max="300" step="1" class="border rounded px-2 py-1 w-24 mr-2" bind:value={updateRateLimit} title="Requêtes/minute" />
+  <button class="bg-orange-500 text-white px-4 py-2 rounded" on:click={launchUpdate} disabled={updateRunning}>
+    {updateRunning ? 'Mise à jour détails en cours...' : 'Mettre à jour détails torrents'}
+  </button>
+  <button class="bg-gray-700 text-white px-4 py-2 rounded" on:click={() => { showUpdateLogModal = true; fetchUpdateLog(); }}>
+    Voir logs mise à jour
+  </button>
+<!-- Modal logs mise à jour détails torrents -->
+<Modal bind:open={showUpdateLogModal} on:close={() => showUpdateLogModal = false}>
+  <div class="flex items-center justify-between mb-2">
+    <div class="font-bold">Logs mise à jour détails torrents</div>
+    <button class="text-gray-500 hover:text-black text-xl" on:click={() => showUpdateLogModal = false}>×</button>
+  </div>
+  <div class="mb-2">
+    <div class="h-2 w-full bg-gray-200 rounded">
+      <div class="h-2 bg-orange-500 rounded" style="width: {updateProgress.total > 0 ? Math.round(100 * updateProgress.done / updateProgress.total) : 0}%"></div>
+    </div>
+    <div class="text-xs text-gray-600 mt-1">Progression : {updateProgress.done}/{updateProgress.total}</div>
+  </div>
+  <div class="bg-gray-900 text-green-100 font-mono text-xs rounded p-2 h-64 overflow-y-auto border border-gray-700">
+    {#each updateLog as line}
+      <div>{line}</div>
+    {/each}
+  </div>
+  <div class="flex justify-end mt-2">
+    <button class="bg-gray-700 text-white px-3 py-1 rounded" on:click={() => showUpdateLogModal = false}>Fermer</button>
+  </div>
+</Modal>
+</div>
+
+{#if showSyncToast}
+  <div class="fixed top-4 right-4 z-50 px-4 py-2 rounded shadow text-white bg-blue-600">
+    {syncStatus}
+  </div>
+{/if}
+
+<!-- Modal logs synchro -->
+<Modal bind:open={showSyncLogModal} on:close={() => showSyncLogModal = false}>
+  <div class="flex items-center justify-between mb-2">
+    <div class="font-bold">Logs synchronisation RD</div>
+    <button class="text-gray-500 hover:text-black text-xl" on:click={() => showSyncLogModal = false}>×</button>
+  </div>
+  <div class="mb-2">
+    <div class="h-2 w-full bg-gray-200 rounded">
+      <div class="h-2 bg-blue-600 rounded" style="width: {syncProgress.total > 0 ? Math.round(100 * syncProgress.done / syncProgress.total) : 0}%"></div>
+    </div>
+    <div class="text-xs text-gray-600 mt-1">Progression : {syncProgress.done}/{syncProgress.total}</div>
+  </div>
+  <div class="bg-gray-900 text-green-100 font-mono text-xs rounded p-2 h-64 overflow-y-auto border border-gray-700">
+    {#each syncLog as line}
+      <div>{line}</div>
+    {/each}
+  </div>
+  <div class="flex justify-end mt-2">
+    <button class="bg-gray-700 text-white px-3 py-1 rounded" on:click={() => showSyncLogModal = false}>Fermer</button>
+  </div>
+</Modal>
+
+<div class="mb-4 text-xs text-gray-500">
+  <b>État synchronisation :</b> {syncRunning ? 'En cours' : syncStatus || 'Aucune'}
+  {#if syncProgress.total > 0}
+    <span class="ml-2">({syncProgress.done}/{syncProgress.total})</span>
+  {/if}
+</div>
+<div class="mb-4 text-xs text-gray-500">
+  <b>État mise à jour détails :</b> {updateRunning ? 'En cours' : updateStatus || 'Aucune'}
+  {#if updateProgress.total > 0}
+    <span class="ml-2">({updateProgress.done}/{updateProgress.total})</span>
+  {/if}
 </div>
 
 <h2 class="text-xl font-semibold mb-2 mt-8">{ $t('system_info') || 'Informations système' }</h2>
@@ -112,6 +358,7 @@
     {/if}
   </ul>
 </div>
+import Modal from '$lib/components/ui/Modal.svelte';
 </script>
 
 <h1 class="text-2xl font-bold mb-6">{ $t('dashboard') || 'Dashboard' }</h1>
