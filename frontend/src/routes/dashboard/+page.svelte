@@ -164,7 +164,6 @@
   }
 
   import { onMount, onDestroy } from 'svelte';
-  import { t } from 'svelte-i18n';
   import { apiUrl } from '$lib/api.js';
   let stats = { total: 0, actifs: 0, termines: 0, erreurs: 0, volume: 0 };
   let torrents = [];
