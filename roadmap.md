@@ -18,7 +18,6 @@
 - Préparer l’internationalisation avec une librairie adaptée (ex : svelte-i18n).
 
 ### 1.4. Tests et CI
-- Mettre en place des tests unitaires et E2E (ex : Playwright).
 - Ajouter un workflow CI pour lint, build et tests.
 
 ---
