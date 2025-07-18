@@ -60,11 +60,27 @@
 - [x] Documentation d’usage et cas d’erreur (docs/QUEUE.md)
 
 ## 9. Déploiement (à faire)
-- Dockerfile complet pour déploiement autonome
-- Documentation procédure de déploiement (Docker, systemd, etc.)
+
+- [x] Dockerfile complet pour déploiement autonome (backend et frontend)
+- [x] Dockerfiles dédiés dans `backend/` et `frontend/`
+- [x] Fichier `docker-compose.yml` à la racine
+- [x] Fichier `.env` dans `config/` pour le token RD
+- [x] Adaptation du frontend : tous les appels API utilisent la fonction `apiUrl` et la variable d’environnement `VITE_API_URL` (`import.meta.env.VITE_API_URL`)
+- [x] Documentation procédure de déploiement (Docker, systemd, Docker Compose)
+- [x] Démarrage automatisé avec `docker compose up -d`
+- [x] Conseils sécurité, persistance, logs, arrêt, reverse proxy, documentation
+
+**Reste à faire :**
+- [ ] Monitoring avancé (Sentry, alertes, dashboards temps réel)
+- [ ] Déploiement cloud (optionnel)
+    - [ ] Ajouter un service reverse proxy (nginx ou caddy) dans `docker-compose.yml` avec configuration adaptée (HTTPS, routage /api)
+    - [ ] Créer un dossier `ansible/` avec un playbook pour automatiser l'installation, le déploiement, la gestion des secrets et la configuration du proxy
+    - [ ] Mettre en place un pipeline CI/CD (ex : `.github/workflows/deploy.yml`) pour build, test, push et déploiement auto
+    - [ ] Documenter la procédure cloud dans `docs/DEPLOIEMENT.md` (prérequis, sécurité, troubleshooting, exemples)
+    - [ ] Tester et valider le déploiement sur un cloud cible (VPS, AWS, GCP, etc.)
+- [ ] Améliorations continues selon retours utilisateurs et besoins production
 
 ---
 
-Prochaine étape :
-- Déploiement (Dockerfile, documentation procédure Docker/systemd)
+Le projet est prêt pour un déploiement automatisé, sécurisé et reproductible.
 

@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+import { onMount } from 'svelte';
+import { apiUrl } from '$lib/api.js';
   import { t } from 'svelte-i18n';
   let queue = [];
   let loading = false;
@@ -9,7 +10,7 @@
     loading = true;
     error = '';
     try {
-      const res = await fetch('/api/queue');
+      const res = await fetch(apiUrl('/api/queue'));
       if (res.ok) {
         queue = await res.json();
       } else {
@@ -25,7 +26,7 @@
     const item = queue.find(q => q.id === id);
     if (!item) return;
     const newPriority = item.priority + delta;
-    await fetch(`/api/queue/${id}`, {
+    await fetch(apiUrl(`/api/queue/${id}`), {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ priority: newPriority })
@@ -34,7 +35,7 @@
   }
 
   async function removeFromQueue(id: number) {
-    await fetch(`/api/queue/${id}`, { method: 'DELETE' });
+    await fetch(apiUrl(`/api/queue/${id}`), { method: 'DELETE' });
     fetchQueue();
   }
 
@@ -50,7 +51,7 @@
 
   async function addToQueue() {
     if (!newTorrentId) return;
-    await fetch('/api/queue', {
+    await fetch(apiUrl('/api/queue'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ torrent_id: newTorrentId })

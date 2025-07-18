@@ -13,7 +13,8 @@
     loading = true;
     error = '';
     try {
-      const res = await fetch('/api/torrents', {
+      import { apiUrl } from '$lib/api.js';
+      const res = await fetch(apiUrl('/api/torrents'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ magnet })

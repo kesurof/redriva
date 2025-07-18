@@ -16,7 +16,8 @@
     error = '';
     detail = null;
     try {
-      const res = await fetch(`/api/torrents/${torrentId}`);
+      import { apiUrl } from '$lib/api.js';
+      const res = await fetch(apiUrl(`/api/torrents/${torrentId}`));
       const data = await res.json();
       if (data.success) {
         detail = data.data;

@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+import { onMount } from 'svelte';
+import { apiUrl } from '$lib/api.js';
   import Table from '$lib/components/ui/Table.svelte';
   import Loader from '$lib/components/ui/Loader.svelte';
   import Notification from '$lib/components/ui/Notification.svelte';
@@ -23,7 +24,7 @@
   async function fetchTorrents() {
     loading = true;
     try {
-      const res = await fetch('/api/torrents');
+      const res = await fetch(apiUrl('/api/torrents'));
       const data = await res.json();
       if (data.success) {
         torrents = data.data;
@@ -54,7 +55,7 @@
     loading = true;
     error = '';
     try {
-      const res = await fetch(`/api/torrents/${id}`, { method: 'DELETE' });
+      const res = await fetch(apiUrl(`/api/torrents/${id}`), { method: 'DELETE' });
       const data = await res.json();
       if (data.success) {
         notifType = 'success';

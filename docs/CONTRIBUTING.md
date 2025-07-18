@@ -18,3 +18,13 @@
 - Préférez des commits atomiques et explicites
 - Utilisez des issues pour discuter des évolutions majeures
 - Respectez le Code of Conduct
+
+
+## Déploiement et automatisation
+
+- Privilégiez Docker et Docker Compose pour tout déploiement local ou cloud.
+- Toute évolution touchant au déploiement (Dockerfile, docker-compose.yml, scripts Ansible, CI/CD) doit être testée et documentée.
+- Pour le cloud, ajoutez un reverse proxy (nginx/caddy) et automatisez via Ansible ou pipeline CI/CD (GitHub Actions, etc.).
+- Ne commitez jamais de secrets ou de tokens sensibles (ex : RD_TOKEN) dans le dépôt.
+- Documentez toute procédure de déploiement ou d’automatisation dans `docs/DEPLOIEMENT.md`.
+- Vérifiez la compatibilité multi-environnements (local, Docker, cloud) avant toute PR majeure.

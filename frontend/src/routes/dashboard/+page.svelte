@@ -1,5 +1,6 @@
 <script lang="ts">
   import { t } from 'svelte-i18n';
+  import { apiUrl } from '$lib/api.js';
   let stats = { total: 0, actifs: 0, termines: 0, erreurs: 0, volume: 0 };
   let torrents = [];
   // Filtres
@@ -27,7 +28,7 @@
   // Récupération des quotas et logs à l'initialisation
   onMount(async () => {
     try {
-      const res = await fetch('/api/quotas');
+      const res = await fetch(apiUrl('/api/quotas'));
       if (res.ok) {
         const data = await res.json();
         quotaRest = data.quota_rest;
@@ -36,21 +37,21 @@
       }
     } catch (e) {}
     try {
-      const res = await fetch('/api/logs');
+      const res = await fetch(apiUrl('/api/logs'));
       if (res.ok) {
         const data = await res.json();
         logs = data.logs || [];
       }
     } catch (e) {}
     try {
-      const res = await fetch('/api/system');
+      const res = await fetch(apiUrl('/api/system'));
       if (res.ok) {
         const data = await res.json();
         system = data;
       }
     } catch (e) {}
     try {
-      const res = await fetch('/api/support');
+      const res = await fetch(apiUrl('/api/support'));
       if (res.ok) {
         const data = await res.json();
         support = data;
