@@ -4,8 +4,12 @@ FROM node:18-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json* ./
 COPY src ./src
+COPY svelte.config.js ./
+COPY vite.config.js ./
 COPY tailwind.config.cjs ./
-RUN npm install && npm run build
+ENV PATH="./node_modules/.bin:$PATH"
+RUN npm install
+RUN npm run build
 
 # Étape de déploiement
 FROM node:18-alpine
