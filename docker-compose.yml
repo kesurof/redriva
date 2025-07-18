@@ -12,8 +12,6 @@ services:
       - ./logs:/app/logs
     ports:
       - "8000:8000"
-    environment:
-      - RD_TOKEN=${RD_TOKEN}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/ping"]
