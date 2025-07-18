@@ -24,16 +24,61 @@ Redriva est une application web complète pour gérer, visualiser et automatiser
 - `systemd/` : fichiers d’unités systemd (déploiement classique)
 
 ## Déploiement rapide (Docker Compose recommandé)
-1. Clonez le dépôt et placez-vous à la racine.
-2. Copiez le fichier `.env` d’exemple dans `config/` et renseignez votre token Real-Debrid.
-3. Lancez :
+
+### Prérequis
+- Docker et Docker Compose installés
+- Un token Real-Debrid valide (à placer dans `config/.env`)
+
+### Déploiement local complet
+1. Clonez le dépôt et placez-vous à la racine du projet :
    ```sh
+   git clone https://github.com/kesurof/redriva.git
+   cd redriva
+   ```
+2. Éditez le fichier `config/.env` et renseignez votre token Real-Debrid :
+   ```sh
+   nano config/.env
+   # ou utilisez votre éditeur préféré
+   # Remplacez la valeur de RD_TOKEN=... par votre token
+   ```
+3. Lancez la stack complète (backend + frontend) :
+   ```sh
+   docker compose build
    docker compose up -d
    ```
-4. Accédez à l’interface web sur [http://localhost:5173](http://localhost:5173)
-5. L’API backend est disponible sur [http://localhost:8000](http://localhost:8000)
+4. Vérifiez que les services sont bien démarrés :
+   ```sh
+   docker compose ps
+   docker compose logs -f frontend
+   docker compose logs -f backend
+   ```
+5. Accédez à l’interface web :
+   - Frontend : [http://localhost:5173](http://localhost:5173)
+   - API backend : [http://localhost:8000](http://localhost:8000)
 
-> Les données et logs sont persistés dans les dossiers `data/` et `logs/`.
+> Les données (SQLite) et logs sont persistés dans les dossiers `data/` et `logs/` montés en volume.
+
+### Déploiement production/cloud (recommandé)
+1. **Reverse proxy HTTPS** : ajoutez un service nginx/caddy/traefik dans `docker-compose.yml` pour :
+   - Terminer TLS (HTTPS)
+   - Router `/api` vers le backend (8000), `/` vers le frontend (5173 ou 3000)
+   - Exemple de config nginx : voir `docs/DEPLOIEMENT.md`
+2. **Variables d’environnement** : ne jamais commiter de secrets, utilisez `config/.env` monté en volume ou injecté par CI/CD.
+3. **Build & déploiement CI/CD** :
+   - Utilisez GitHub Actions ou GitLab CI pour builder les images, lancer les tests, et déployer automatiquement sur le serveur cible.
+   - Voir `.github/workflows/deploy.yml` pour un exemple.
+4. **Mise à jour** :
+   ```sh
+   git pull
+   docker compose build
+   docker compose up -d
+   ```
+5. **Sauvegardes** : sauvegardez régulièrement `data/` (base SQLite) et `logs/`.
+
+### Conseils avancés
+- Pour un déploiement systemd classique, voir `systemd/redriva.service` et la doc `docs/DEPLOIEMENT.md`.
+- Pour un déploiement cloud scalable, adaptez les ports, variables et volumes dans `docker-compose.yml`.
+- Pour un déploiement multi-utilisateurs, voir la roadmap et les guides d’authentification dans `docs/`.
 
 ## Déploiement cloud & production
 - Ajoutez un reverse proxy (nginx/caddy) dans `docker-compose.yml` pour HTTPS et le routage `/api`.
