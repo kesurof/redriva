@@ -7,6 +7,110 @@
   let status = '';
   let date = '';
   let size = '';
+
+  // Quotas dynamiques
+  let quotaRest = null;
+  let slotsUsed = null;
+  let slotsTotal = null;
+
+  // Logs dynamiques
+  let logs = [];
+
+  // Informations système dynamiques
+  let system = { version: '', backend_status: '', last_backup: '' };
+
+  // Support dynamique
+  let support = { faq: [], links: [] };
+
+  import { onMount } from 'svelte';
+
+  // Récupération des quotas et logs à l'initialisation
+  onMount(async () => {
+    try {
+      const res = await fetch('/api/quotas');
+      if (res.ok) {
+        const data = await res.json();
+        quotaRest = data.quota_rest;
+        slotsUsed = data.slots_used;
+        slotsTotal = data.slots_total;
+      }
+    } catch (e) {}
+    try {
+      const res = await fetch('/api/logs');
+      if (res.ok) {
+        const data = await res.json();
+        logs = data.logs || [];
+      }
+    } catch (e) {}
+    try {
+      const res = await fetch('/api/system');
+      if (res.ok) {
+        const data = await res.json();
+        system = data;
+      }
+    } catch (e) {}
+    try {
+      const res = await fetch('/api/support');
+      if (res.ok) {
+        const data = await res.json();
+        support = data;
+      }
+    } catch (e) {}
+  });
+<h2 class="text-xl font-semibold mb-2 mt-8">{ $t('support') || 'Aide & support' }</h2>
+<div class="bg-white dark:bg-gray-800 rounded shadow p-4 mb-8">
+  <div class="mb-2 font-bold">FAQ</div>
+  <ul class="mb-4 list-disc ml-6 text-xs">
+    {#if support.faq.length === 0}
+      <li>{ $t('no_faq') || 'Aucune question fréquente.' }</li>
+    {:else}
+      {#each support.faq as item}
+        <li class="mb-1"><span class="font-semibold">{item.q}</span><br /><span class="text-gray-500">{item.a}</span></li>
+      {/each}
+    {/if}
+  </ul>
+  <div class="mb-2 font-bold">{ $t('links') || 'Liens utiles' }</div>
+  <ul class="list-disc ml-6 text-xs">
+    {#if support.links.length === 0}
+      <li>{ $t('no_links') || 'Aucun lien.' }</li>
+    {:else}
+      {#each support.links as link}
+        <li><a class="text-blue-600 underline" href={link.url} target="_blank" rel="noopener">{link.label}</a></li>
+      {/each}
+    {/if}
+  </ul>
+</div>
+<!-- Actions globales -->
+<div class="flex flex-wrap gap-4 mb-8">
+  <button class="bg-green-600 text-white px-4 py-2 rounded">{ $t('add') || 'Ajouter' }</button>
+  <button class="bg-blue-600 text-white px-4 py-2 rounded">{ $t('refresh') || 'Rafraîchir' }</button>
+  <button class="bg-gray-600 text-white px-4 py-2 rounded">{ $t('export') || 'Exporter' }</button>
+</div>
+
+<h2 class="text-xl font-semibold mb-2 mt-8">{ $t('system_info') || 'Informations système' }</h2>
+<div class="bg-white dark:bg-gray-800 rounded shadow p-4 mb-8">
+  <ul class="text-xs">
+    <li><span class="font-bold">{ $t('version') || 'Version' } :</span> {system.version}</li>
+    <li><span class="font-bold">{ $t('backend_status') || 'État backend' } :</span> {system.backend_status}</li>
+    <li><span class="font-bold">{ $t('last_backup') || 'Dernier backup' } :</span> {system.last_backup}</li>
+  </ul>
+</div>
+<h2 class="text-xl font-semibold mb-2 mt-8">{ $t('recent_logs') || 'Logs récents' }</h2>
+<div class="bg-white dark:bg-gray-800 rounded shadow p-4 mb-8">
+  <ul class="text-xs font-mono space-y-1">
+    {#if logs.length === 0}
+      <li class="text-gray-400">{ $t('no_logs') || 'Aucun log récent.' }</li>
+    {:else}
+      {#each logs as log}
+        <li>
+          <span class="text-gray-500">[{log.timestamp}]</span>
+          <span class="font-bold {log.level === 'ERROR' ? 'text-red-600' : log.level === 'WARNING' ? 'text-yellow-600' : 'text-green-600'}">{log.level}</span>
+          <span> {log.message}</span>
+        </li>
+      {/each}
+    {/if}
+  </ul>
+</div>
 </script>
 
 <h1 class="text-2xl font-bold mb-6">{ $t('dashboard') || 'Dashboard' }</h1>
@@ -106,8 +210,20 @@
   <div class="bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded shadow p-4">
     <div class="font-bold mb-1">{ $t('quotas') || 'Quotas' }</div>
     <ul class="text-xs list-disc ml-4">
-      <li>Quota RD restant : 12 Go</li>
-      <li>Slots utilisés : 3/5</li>
+      <li>
+        {#if quotaRest !== null}
+          { $t('quota_remaining') || 'Quota RD restant' } : {quotaRest} Go
+        {:else}
+          { $t('quota_remaining') || 'Quota RD restant' } : ...
+        {/if}
+      </li>
+      <li>
+        {#if slotsUsed !== null && slotsTotal !== null}
+          { $t('slots_used') || 'Slots utilisés' } : {slotsUsed}/{slotsTotal}
+        {:else}
+          { $t('slots_used') || 'Slots utilisés' } : ...
+        {/if}
+      </li>
     </ul>
   </div>
 </div>

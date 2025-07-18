@@ -43,11 +43,11 @@
   - [x] Tableau des jobs/torrents récents (statut, progression, taille, date, actions rapides)
   - [x] Alertes & notifications (erreurs récentes, torrents en échec, liens morts, quotas)
   - [x] Recherche & filtres (nom, statut, date, taille, type)
-  - [ ] Utilisation des quotas (quota RD restant, slots utilisés/disponibles)
-  - [ ] Logs récents (actions utilisateur, logs système)
-  - [ ] Actions globales (ajout, rafraîchir, exporter)
-  - [ ] Informations système (version, état backend/API, dernier backup)
-  - [ ] Aide & support (FAQ, documentation, support)
+  - [x] Utilisation des quotas (quota RD restant, slots utilisés/disponibles)
+  - [x] Logs récents (actions utilisateur, logs système)
+  - [x] Actions globales (ajout, rafraîchir, exporter)
+  - [x] Informations système (version, état backend/API, dernier backup)
+  - [x] Aide & support (FAQ, documentation, support)
 
 
 ## 8. Déploiement (à faire)
@@ -57,20 +57,22 @@
 ---
 
 
+
 Blocs dashboard implémentés :
 - Statistiques globales
 - Tableau des torrents récents
 - Recherche & filtres
 - Alertes & notifications
 - Graphiques & tendances
-
-Prochaines étapes :
 - Utilisation des quotas (quota RD, slots)
 - Logs récents (actions utilisateur, logs système)
 - Actions globales (ajout, rafraîchir, exporter)
 - Informations système (version, état backend, backup)
-- Aide & support (FAQ, doc, support)
 
-Étape active : connexion du frontend avec l’API (données dashboard dynamiques)
+
+Tous les blocs du dashboard Redriva sont dynamiques, connectés à l’API backend et finalisés.
+
+Prochaine étape :
+- Déploiement (Dockerfile, documentation procédure Docker/systemd)
 
 Ce plan sera mis à jour au fil de l’avancement du projet.
