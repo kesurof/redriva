@@ -1,5 +1,4 @@
 #!/bin/bash
-# Script d’arrêt propre du service Redriva
+# Script d'arrêt Redriva (arrête le process uvicorn)
 
-pkill -f "../backend/app.py"
-exit 0
+pkill -f "uvicorn.*api:app" || echo "Aucun process uvicorn trouvé."
