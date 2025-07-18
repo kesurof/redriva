@@ -8,15 +8,18 @@ COPY svelte.config.js ./
 COPY vite.config.js ./
 COPY tailwind.config.cjs ./
 
-# Ajout automatique de l'adapter-static si absent
+
+# Environnement Vite/SvelteKit moderne
 ENV PATH="./node_modules/.bin:$PATH"
-RUN npm install && npm install @sveltejs/adapter-static --save-dev
-RUN npx vite --version
+RUN npm install
 RUN npm run build
 
+
+# Utilisation du preview natif SvelteKit (adapter-auto)
 FROM node:20-alpine
 WORKDIR /app
-COPY --from=build /app/build ./build
-RUN npm install -g serve
-EXPOSE 5173
-CMD ["serve", "-s", "build", "-l", "5173"]
+COPY --from=build /app .
+ENV NODE_ENV=production
+RUN npm install --omit=dev
+EXPOSE 4173
+CMD ["npm", "run", "preview", "--", "--port", "4173", "--host"]
