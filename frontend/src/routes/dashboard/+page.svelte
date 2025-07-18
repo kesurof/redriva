@@ -1,4 +1,12 @@
 <script lang="ts">
+  import { t } from 'svelte-i18n';
+  $: detailsLabel = $t('details') || 'Détails';
+  $: deleteLabel = $t('delete') || 'Supprimer';
+  $: actionsLabel = $t('actions') || 'Actions';
+  $: filenameLabel = $t('filename') || 'Nom';
+  $: statusLabel = $t('status') || 'Statut';
+  $: sizeLabel = $t('size') || 'Taille';
+  $: addedLabel = $t('added') || 'Ajouté';
   import Modal from '$lib/components/ui/Modal.svelte';
   let syncStatus = '';
   let syncRunning = false;
@@ -418,11 +426,11 @@
     <thead>
       <tr>
         <th class="px-4 py-2">ID</th>
-        <th class="px-4 py-2">{ $t('filename') || 'Nom' }</th>
-        <th class="px-4 py-2">{ $t('status') || 'Statut' }</th>
-        <th class="px-4 py-2">{ $t('size') || 'Taille' }</th>
-        <th class="px-4 py-2">{ $t('added') || 'Ajouté' }</th>
-        <th class="px-4 py-2">{ $t('actions') || 'Actions' }</th>
+        <th class="px-4 py-2">{filenameLabel}</th>
+        <th class="px-4 py-2">{statusLabel}</th>
+        <th class="px-4 py-2">{sizeLabel}</th>
+        <th class="px-4 py-2">{addedLabel}</th>
+        <th class="px-4 py-2">{actionsLabel}</th>
       </tr>
     </thead>
     <tbody>
@@ -435,8 +443,8 @@
           <td class="px-4 py-2">{t.added}</td>
           <td class="px-4 py-2">
             <!-- Actions rapides à venir -->
-            <button class="bg-blue-600 text-white px-2 py-1 rounded text-xs mr-2">{ $t('details') || 'Détails' }</button>
-            <button class="bg-red-600 text-white px-2 py-1 rounded text-xs">{ $t('delete') || 'Supprimer' }</button>
+            <button class="bg-blue-600 text-white px-2 py-1 rounded text-xs mr-2">{detailsLabel}</button>
+            <button class="bg-red-600 text-white px-2 py-1 rounded text-xs">{deleteLabel}</button>
           </td>
         </tr>
       {/each}

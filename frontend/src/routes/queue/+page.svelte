@@ -1,4 +1,12 @@
 <script lang="ts">
+  $: queueLabel = $t('queue') || "File d'attente";
+  $: addLabel = $t('add') || 'Ajouter';
+  $: torrentIdLabel = $t('torrent_id') || 'Torrent';
+  $: priorityLabel = $t('priority') || 'Priorité';
+  $: statusLabel = $t('status') || 'Statut';
+  $: addedLabel = $t('added') || 'Ajouté';
+  $: actionsLabel = $t('actions') || 'Actions';
+  $: deleteLabel = $t('delete') || 'Supprimer';
 import { onMount } from 'svelte';
 import { apiUrl } from '$lib/api.js';
   import { t } from 'svelte-i18n';
@@ -68,11 +76,11 @@ import { apiUrl } from '$lib/api.js';
 </script>
 
 
-<h1 class="text-2xl font-bold mb-6">{ $t('queue') || 'File d\'attente' }</h1>
+<h1 class="text-2xl font-bold mb-6">{queueLabel}</h1>
 
 <form class="mb-4 flex gap-2" on:submit|preventDefault={addToQueue}>
   <input class="border rounded px-2 py-1" placeholder="ID du torrent à ajouter" bind:value={newTorrentId} />
-  <button class="bg-green-600 text-white px-4 py-2 rounded" type="submit">{ $t('add') || 'Ajouter' }</button>
+  <button class="bg-green-600 text-white px-4 py-2 rounded" type="submit">{addLabel}</button>
 </form>
 
 {#if loading}
@@ -84,11 +92,11 @@ import { apiUrl } from '$lib/api.js';
     <thead>
       <tr>
         <th>ID</th>
-        <th>{ $t('torrent_id') || 'Torrent' }</th>
-        <th>{ $t('priority') || 'Priorité' }</th>
-        <th>{ $t('status') || 'Statut' }</th>
-        <th>{ $t('added') || 'Ajouté' }</th>
-        <th>{ $t('actions') || 'Actions' }</th>
+        <th>{torrentIdLabel}</th>
+        <th>{priorityLabel}</th>
+        <th>{statusLabel}</th>
+        <th>{addedLabel}</th>
+        <th>{actionsLabel}</th>
       </tr>
     </thead>
     <tbody>
@@ -104,7 +112,7 @@ import { apiUrl } from '$lib/api.js';
           <td>{q.status}</td>
           <td>{q.added_at}</td>
           <td>
-            <button class="bg-red-600 text-white px-2 py-1 rounded text-xs" on:click={() => removeFromQueue(q.id)}>{ $t('delete') || 'Supprimer' }</button>
+            <button class="bg-red-600 text-white px-2 py-1 rounded text-xs" on:click={() => removeFromQueue(q.id)}>{deleteLabel}</button>
           </td>
         </tr>
       {/each}

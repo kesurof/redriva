@@ -1,5 +1,9 @@
 <script>
   import { t } from 'svelte-i18n';
+  $: torrentsLabel = $t('torrents') || 'Torrents';
+  $: downloadsLabel = $t('downloads') || 'Téléchargements';
+  $: scraperLabel = $t('scraper') || 'Scraper';
+  $: settingsLabel = $t('settings') || 'Paramètres';
   let dark = false;
   let navOpen = false;
 
@@ -30,10 +34,10 @@
         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
       </button>
       <nav class="space-x-4 hidden md:flex items-center">
-        <a href="/torrents" class="hover:underline">{ $t('torrents') }</a>
-        <a href="/downloads" class="hover:underline">{ $t('downloads') }</a>
-        <a href="/scraper" class="hover:underline">{ $t('scraper') }</a>
-        <a href="/settings" class="hover:underline">{ $t('settings') }</a>
+        <a href="/torrents" class="hover:underline">{torrentsLabel}</a>
+        <a href="/downloads" class="hover:underline">{downloadsLabel}</a>
+        <a href="/scraper" class="hover:underline">{scraperLabel}</a>
+        <a href="/settings" class="hover:underline">{settingsLabel}</a>
         <button class="ml-4 px-2 py-1 rounded bg-gray-200 dark:bg-gray-700" on:click={toggleDark} aria-label="Toggle dark mode">
           {dark ? '🌙' : '☀️'}
         </button>
@@ -41,10 +45,10 @@
     </div>
     {#if navOpen}
       <nav class="md:hidden bg-white dark:bg-gray-800 px-4 pb-4 flex flex-col space-y-2">
-        <a href="/torrents" class="hover:underline" on:click={() => navOpen = false}>{ $t('torrents') }</a>
-        <a href="/downloads" class="hover:underline" on:click={() => navOpen = false}>{ $t('downloads') }</a>
-        <a href="/scraper" class="hover:underline" on:click={() => navOpen = false}>{ $t('scraper') }</a>
-        <a href="/settings" class="hover:underline" on:click={() => navOpen = false}>{ $t('settings') }</a>
+        <a href="/torrents" class="hover:underline" on:click={() => navOpen = false}>{torrentsLabel}</a>
+        <a href="/downloads" class="hover:underline" on:click={() => navOpen = false}>{downloadsLabel}</a>
+        <a href="/scraper" class="hover:underline" on:click={() => navOpen = false}>{scraperLabel}</a>
+        <a href="/settings" class="hover:underline" on:click={() => navOpen = false}>{settingsLabel}</a>
         <button class="mt-2 px-2 py-1 rounded bg-gray-200 dark:bg-gray-700 w-max" on:click={() => { toggleDark(); navOpen = false; }} aria-label="Toggle dark mode">
           {dark ? '🌙' : '☀️'}
         </button>
