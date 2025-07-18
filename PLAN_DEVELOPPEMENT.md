@@ -78,6 +78,15 @@
     - [ ] Mettre en place un pipeline CI/CD (ex : `.github/workflows/deploy.yml`) pour build, test, push et déploiement auto
     - [ ] Documenter la procédure cloud dans `docs/DEPLOIEMENT.md` (prérequis, sécurité, troubleshooting, exemples)
     - [ ] Tester et valider le déploiement sur un cloud cible (VPS, AWS, GCP, etc.)
+- [ ] Maintenance & synchronisation avancée
+    - [ ] Ajouter une commande ou un script d’admin pour la synchronisation complète Real-Debrid → SQLite (inventaire, migration, audit)
+        - [ ] Intégrer la récupération détaillée des torrents (endpoint /torrents/info/{id}) en batch asynchrone, avec gestion des quotas et erreurs
+    - [ ] Améliorer la gestion avancée des quotas, erreurs et logs dans les workers (robustesse, alertes, logs structurés)
+    - [ ] Ajouter une interface d’audit/maintenance (page dashboard ou endpoint admin) pour :
+        - [ ] Lancer des synchronisations
+        - [ ] Exporter les données (CSV, JSON…)
+        - [ ] Suivre l’état de la base (nombre de torrents, détails, erreurs récentes)
+    - [ ] Documenter ces fonctions dans `docs/DEPLOIEMENT.md` et `docs/MAINTENANCE.md`
 - [ ] Améliorations continues selon retours utilisateurs et besoins production
 
 ---
