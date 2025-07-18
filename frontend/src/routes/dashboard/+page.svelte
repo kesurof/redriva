@@ -390,8 +390,8 @@
     </select>
   </div>
   <div>
-    <label class="block text-xs mb-1">{ $t('date') || 'Date' }</label>
-    <input type="date" class="border rounded px-2 py-1" bind:value={date} />
+    <label for="date-input" class="block text-xs mb-1">{ $t('date') || 'Date' }</label>
+    <input id="date-input" type="date" class="border rounded px-2 py-1" bind:value={date} />
   </div>
   <div>
     <label for="size-input" class="block text-xs mb-1">{ $t('size') || 'Taille min (Mo)' }</label>

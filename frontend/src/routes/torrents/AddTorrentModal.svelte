@@ -35,7 +35,8 @@
 </script>
 <Modal {open} {onClose}>
   <h2 class="text-lg font-bold mb-2">{ $t('add') } Torrent</h2>
-  <input class="w-full border rounded px-2 py-1 mb-2" bind:value={magnet} placeholder="Magnet link..." />
+  <label for="magnet-input" class="block text-xs mb-1">{ $t('magnet_link') || 'Lien magnet' }</label>
+  <input id="magnet-input" class="w-full border rounded px-2 py-1 mb-2" bind:value={magnet} placeholder="Magnet link..." />
   {#if error}
     <div class="text-red-500 text-sm mb-2">{error}</div>
   {/if}

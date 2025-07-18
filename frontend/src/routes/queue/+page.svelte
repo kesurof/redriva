@@ -79,7 +79,8 @@ import { apiUrl } from '$lib/api.js';
 <h1 class="text-2xl font-bold mb-6">{queueLabel}</h1>
 
 <form class="mb-4 flex gap-2" on:submit|preventDefault={addToQueue}>
-  <input class="border rounded px-2 py-1" placeholder="ID du torrent à ajouter" bind:value={newTorrentId} />
+  <label for="queue-torrent-id" class="block text-xs mb-1">ID du torrent à ajouter</label>
+  <input id="queue-torrent-id" class="border rounded px-2 py-1" placeholder="ID du torrent à ajouter" bind:value={newTorrentId} />
   <button class="bg-green-600 text-white px-4 py-2 rounded" type="submit">{addLabel}</button>
 </form>
 

@@ -1,6 +1,7 @@
 <script lang="ts">
   import Modal from '$lib/components/ui/Modal.svelte';
   import { t } from 'svelte-i18n';
+  import { apiUrl } from '$lib/api.js';
   export let open = false;
   export let onClose = () => {};
   export let torrentId: string = '';
@@ -16,7 +17,6 @@
     error = '';
     detail = null;
     try {
-      import { apiUrl } from '$lib/api.js';
       const res = await fetch(apiUrl(`/api/torrents/${torrentId}`));
       const data = await res.json();
       if (data.success) {
