@@ -1,0 +1,66 @@
+<div class="space-y-6">
+    <h3 class="text-lg font-medium text-gray-900">Configuration Real-Debrid</h3>
+    
+    <!-- Token Section -->
+    <div class="bg-gray-50 rounded-lg p-4">
+        <label class="block text-sm font-medium text-gray-700 mb-2">Token API</label>
+        <div class="flex items-center space-x-3">
+            {% if token_configured %}
+            <input type="password" 
+                   value="•••••••••••••••••••••••••••••••••••••••••••••" 
+                   class="flex-1 px-3 py-2 border border-gray-300 rounded-md bg-gray-100" 
+                   readonly>
+            <button class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md">
+                Modifier
+            </button>
+            {% else %}
+            <input type="text" 
+                   placeholder="Entrez votre token Real-Debrid" 
+                   class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+            <button class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-md">
+                Sauvegarder
+            </button>
+            {% endif %}
+        </div>
+        {% if not token_configured %}
+        <p class="mt-2 text-sm text-gray-500">
+            Obtenez votre token depuis votre <a href="https://real-debrid.com/apitoken" target="_blank" class="text-blue-600 hover:text-blue-800">compte Real-Debrid</a>
+        </p>
+        {% endif %}
+    </div>
+    
+    <!-- Premium Status -->
+    <div class="bg-gray-50 rounded-lg p-4">
+        <label class="block text-sm font-medium text-gray-700 mb-2">Statut Premium</label>
+        {% if premium_expiry %}
+        <div class="flex items-center space-x-3">
+            <div class="flex-1">
+                <p class="text-sm text-gray-900">Date d'expiration: <span class="font-medium">{{ premium_expiry }}</span></p>
+                {% if days_remaining %}
+                <p class="text-sm text-gray-500">{{ days_remaining }} jours restants</p>
+                {% endif %}
+            </div>
+            <span class="px-3 py-1 bg-green-100 text-green-800 text-sm font-medium rounded-full">
+                Actif
+            </span>
+        </div>
+        {% else %}
+        <div class="flex items-center space-x-3">
+            <p class="flex-1 text-sm text-gray-500">Informations non disponibles</p>
+            <span class="px-3 py-1 bg-gray-100 text-gray-800 text-sm font-medium rounded-full">
+                Non configuré
+            </span>
+        </div>
+        {% endif %}
+    </div>
+    
+    <!-- Test Connection -->
+    <div class="pt-4 border-t border-gray-200">
+        <button hx-post="/settings/debrid/test" 
+                hx-target="#test-result"
+                class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md">
+            Tester la connexion
+        </button>
+        <div id="test-result" class="mt-3"></div>
+    </div>
+</div>

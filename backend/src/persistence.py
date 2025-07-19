@@ -30,6 +30,14 @@ async def init_db():
                 await db.execute(f"ALTER TABLE torrents ADD COLUMN {col} {typ}")
             except Exception:
                 pass  # Colonne déjà existante
+        
+        # Création de la table de configuration
+        await db.execute("""
+        CREATE TABLE IF NOT EXISTS configuration (
+            key TEXT PRIMARY KEY,
+            value TEXT
+        )
+        """)
         await db.commit()
 
 async def save_torrents(torrents: List[Dict]):
@@ -159,3 +167,23 @@ async def delete_queue(queue_id: int):
         cursor = await db.execute("DELETE FROM queue WHERE id = ?", (queue_id,))
         await db.commit()
         return cursor.rowcount
+
+
+# --- Gestion de la configuration ---
+async def save_setting(key: str, value: str):
+    """Sauvegarde ou met à jour un paramètre de configuration."""
+    db_path = get_db_path()
+    async with aiosqlite.connect(db_path) as db:
+        await db.execute(
+            "INSERT OR REPLACE INTO configuration (key, value) VALUES (?, ?)",
+            (key, value)
+        )
+        await db.commit()
+
+async def get_setting(key: str):
+    """Récupère la valeur d'un paramètre de configuration."""
+    db_path = get_db_path()
+    async with aiosqlite.connect(db_path) as db:
+        async with db.execute("SELECT value FROM configuration WHERE key = ?", (key,)) as cursor:
+            row = await cursor.fetchone()
+        return row[0] if row else None

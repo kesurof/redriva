@@ -20,10 +20,6 @@ app = FastAPI()
 # Configuration des templates Jinja2
 templates = Jinja2Templates(directory="templates")
 
-@app.get("/")
-async def read_root(request: Request):
-    return templates.TemplateResponse("base.html", {"request": request})
-
 @app.get("/load-data")
 async def load_data(request: Request):
     torrents = await get_all_torrents()
@@ -556,3 +552,145 @@ async def ping(request: Request):
     except Exception as e:
         log_error(f"Erreur GET /api/ping: {e}")
         return JSONResponse(content={"success": False, "error": str(e)}, status_code=500)
+
+# ===== NOUVELLES ROUTES POUR L'INTERFACE PRINCIPALE =====
+
+def generate_fake_torrents(count=25):
+    """Génère de faux torrents pour le développement"""
+    import random
+    from datetime import datetime, timedelta
+    
+    names = [
+        "Ubuntu.22.04.3.Desktop.amd64", "The.Movie.2023.1080p.BluRay.x264",
+        "TV.Show.S01E01.1080p.WEB.x264", "Game.Setup.v1.2.3", "Album.Artist.2023.FLAC",
+        "Documentary.2023.720p.HDTV.x264", "Software.Pro.v10.2.Cracked",
+        "Movie.Sequel.2023.2160p.UHD.BluRay.x265", "Series.S02.Complete.1080p.WEB",
+        "Anime.Movie.2023.1080p.BluRay", "Music.Collection.320kbps.MP3"
+    ]
+    
+    categories = ["Movies", "TV Shows", "Software", "Games", "Music", "Books", "Anime"]
+    statuses = ["downloaded", "downloading", "queued", "paused", "error"]
+    states = ["downloading", "seeding", "paused", "completed", "error"]
+    
+    torrents = []
+    for i in range(count):
+        base_name = random.choice(names)
+        torrent = {
+            "id": f"rd_{i+1:03d}",
+            "name": f"{base_name}.{random.randint(1000, 9999)}",
+            "title": f"{base_name}.{random.randint(1000, 9999)}",
+            "size": f"{random.uniform(0.5, 50):.1f} GB",
+            "status": random.choice(statuses),
+            "state": random.choice(states),
+            "progress": random.randint(0, 100),
+            "speed": f"{random.uniform(0, 10):.1f} MB/s" if random.choice([True, False]) else "0 B/s",
+            "category": random.choice(categories),
+            "seeders": random.randint(0, 1000),
+            "added_date": (datetime.now() - timedelta(days=random.randint(0, 30))).strftime("%d/%m/%Y %H:%M"),
+            "hash": f"{''.join(random.choices('abcdef0123456789', k=40))}",
+            "magnet_url": f"magnet:?xt=urn:btih:{''.join(random.choices('abcdef0123456789', k=40))}&dn={base_name}"
+        }
+        torrents.append(torrent)
+    
+    return torrents
+
+@app.get("/")
+async def dashboard(request: Request):
+    torrents = generate_fake_torrents(25)
+    return templates.TemplateResponse("dashboard.html", {"request": request, "torrents": torrents})
+
+@app.get("/torrents")
+async def torrents_page(request: Request):
+    torrents = generate_fake_torrents(50)
+    return templates.TemplateResponse("torrents.html", {"request": request, "torrents": torrents})
+
+@app.get("/torrents/{torrent_id}/details")
+async def torrent_details(request: Request, torrent_id: str):
+    # Récupère les détails d'un torrent spécifique
+    all_torrents = generate_fake_torrents(50)
+    torrent = next((t for t in all_torrents if t["id"] == torrent_id), None)
+    
+    if not torrent:
+        raise HTTPException(status_code=404, detail="Torrent not found")
+    
+    return templates.TemplateResponse("torrent_details_modal.html", {"request": request, "torrent": torrent})
+
+@app.delete("/torrents/{torrent_id}")
+async def delete_torrent(torrent_id: str):
+    # Logique de suppression du torrent
+    # Pour le moment, juste un retour de succès
+    return {"success": True, "message": f"Torrent {torrent_id} supprimé"}
+
+@app.post("/torrents/{torrent_id}/reinsert")
+async def reinsert_torrent(torrent_id: str):
+    # Logique de réinsertion du torrent
+    return {"success": True, "message": f"Torrent {torrent_id} réinséré"}
+
+@app.get("/settings")
+async def settings_page(request: Request):
+    # Charge la page settings avec le contenu Debrid par défaut
+    debrid_content = await get_debrid_settings_content()
+    return templates.TemplateResponse("settings.html", {"request": request, "debrid_content": debrid_content})
+
+async def get_debrid_settings_content():
+    """Génère le contenu HTML pour les paramètres Debrid"""
+    # TODO: Récupérer les vraies données de configuration depuis la DB
+    token_configured = False  # await get_setting("rd_token") is not None
+    premium_expiry = None  # await get_rd_premium_info()
+    days_remaining = None
+    
+    # Pour le développement, simulons des données
+    if token_configured:
+        premium_expiry = "31/12/2024"
+        days_remaining = 45
+    
+    from jinja2 import Template
+    with open("templates/settings_debrid.html", "r", encoding="utf-8") as f:
+        template_content = f.read()
+    
+    template = Template(template_content)
+    return template.render(
+        token_configured=token_configured,
+        premium_expiry=premium_expiry,
+        days_remaining=days_remaining
+    )
+
+@app.get("/settings/debrid")
+async def settings_debrid(request: Request):
+    content = await get_debrid_settings_content()
+    return content
+
+@app.get("/settings/arrs")
+async def settings_arrs(request: Request):
+    return """
+    <div class="space-y-6">
+        <h3 class="text-lg font-medium text-gray-900">Configuration *Arrs</h3>
+        <div class="bg-gray-50 rounded-lg p-4">
+            <p class="text-gray-500">Configuration des applications *Arr à venir...</p>
+        </div>
+    </div>
+    """
+
+@app.get("/settings/repair")
+async def settings_repair(request: Request):
+    return """
+    <div class="space-y-6">
+        <h3 class="text-lg font-medium text-gray-900">Réparation et Maintenance</h3>
+        <div class="bg-gray-50 rounded-lg p-4">
+            <p class="text-gray-500">Outils de réparation et maintenance à venir...</p>
+        </div>
+    </div>
+    """
+
+@app.post("/settings/debrid/test")
+async def test_debrid_connection():
+    # TODO: Implémenter le test de connexion Real-Debrid
+    return """
+    <div class="mt-3 p-3 bg-green-100 border border-green-300 rounded-md">
+        <p class="text-green-800 text-sm">✓ Connexion Real-Debrid réussie</p>
+    </div>
+    """
+
+@app.get("/symlinks")
+async def symlinks_page(request: Request):
+    return templates.TemplateResponse("symlinks.html", {"request": request})

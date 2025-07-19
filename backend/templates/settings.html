@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="bg-white rounded-lg shadow-md p-6">
+    <h2 class="text-2xl font-semibold mb-6">Settings</h2>
+    
+    <div class="flex gap-6">
+        <!-- Colonne de gauche - Sous-menu -->
+        <div class="w-64 bg-gray-50 rounded-lg p-4">
+            <nav class="space-y-2">
+                <a href="#" 
+                   hx-get="/settings/debrid" 
+                   hx-target="#settings-content"
+                   class="block px-4 py-2 text-gray-700 hover:bg-blue-100 hover:text-blue-600 rounded-md transition-colors">
+                    Debrid
+                </a>
+                <a href="#" 
+                   hx-get="/settings/arrs" 
+                   hx-target="#settings-content"
+                   class="block px-4 py-2 text-gray-700 hover:bg-blue-100 hover:text-blue-600 rounded-md transition-colors">
+                    *Arrs
+                </a>
+                <a href="#" 
+                   hx-get="/settings/repair" 
+                   hx-target="#settings-content"
+                   class="block px-4 py-2 text-gray-700 hover:bg-blue-100 hover:text-blue-600 rounded-md transition-colors">
+                    Repair
+                </a>
+            </nav>
+        </div>
+        
+        <!-- Colonne de droite - Contenu -->
+        <div class="flex-1">
+            <div id="settings-content">
+                {{ debrid_content | safe }}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
