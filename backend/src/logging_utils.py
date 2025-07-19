@@ -20,6 +20,9 @@ logger.setLevel(logging.INFO)
 if not logger.hasHandlers():
     logger.addHandler(handler)
 
+# Export du logger comme 'log' pour compatibilité
+log = logger
+
 def log_info(msg):
     logger.info(msg)
 

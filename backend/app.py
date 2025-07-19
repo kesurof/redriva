@@ -1,696 +1,259 @@
-# --- Imports et déclaration FastAPI ---
-
+# API FastAPI pure pour Redriva
 import os
-import asyncio
-import aiosqlite
-import aiohttp
-import httpx
-from fastapi import FastAPI, Request, BackgroundTasks, Body, HTTPException, Form
-from fastapi.responses import JSONResponse
-from fastapi.templating import Jinja2Templates
-from pydantic import BaseModel, Field
-from typing import Optional
+import random
+from datetime import datetime, timedelta
+from fastapi import FastAPI, BackgroundTasks, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from typing import Optional, List, Dict, Any
 
-# Importe la persistance asynchrone
-from src.persistence import init_db, save_torrents, get_all_torrents, init_queue_table, get_all_queue, add_to_queue as persist_add_to_queue, update_queue as persist_update_queue, delete_queue as persist_delete_queue, add_torrent as persist_add_torrent
+app = FastAPI(title="Redriva API", version="1.0.0")
 
+# Configuration CORS pour permettre les requêtes depuis le frontend
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],  # SvelteKit dev server
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-app = FastAPI()
+# Modèles Pydantic pour l'API
+class TorrentResponse(BaseModel):
+    id: str
+    name: str
+    title: str
+    size: str
+    status: str
+    state: str
+    progress: int
+    speed: str
+    category: str
+    seeders: int
+    added_date: str
+    hash: str
+    magnet_url: str
 
-# Configuration des templates Jinja2
-templates = Jinja2Templates(directory="templates")
+class TorrentCreate(BaseModel):
+    name: str
+    magnet_url: Optional[str] = None
 
-@app.get("/load-data")
-async def load_data(request: Request):
-    torrents = await get_all_torrents()
-    return templates.TemplateResponse("data_content.html", {"request": request, "torrents": torrents})
+class QueueItemResponse(BaseModel):
+    id: int
+    status: str
+    created_at: str
+    updated_at: str
+    data: Dict[str, Any]
 
-@app.get("/add-torrent-form")
-async def add_torrent_form(request: Request):
-    return templates.TemplateResponse("add_torrent_form.html", {"request": request})
+class QueueItemCreate(BaseModel):
+    data: Dict[str, Any]
 
-@app.post("/add-torrent")
-async def add_torrent(request: Request, torrent_name: str = Form()):
-    # Ajouter le nouveau torrent en base de données
-    await persist_add_torrent(torrent_name)
-    
-    # On renvoie la liste mise à jour des torrents
-    torrents = await get_all_torrents()
-    return templates.TemplateResponse("data_content.html", {"request": request, "torrents": torrents})
+class SystemInfoResponse(BaseModel):
+    cpu_usage: float
+    memory_usage: float
+    disk_usage: float
+    uptime: str
 
-@app.get("/start-device-auth")
-async def start_device_auth(request: Request):
-    client_id = "X245A4XAIBGVM"
-    
-    async with httpx.AsyncClient() as client:
-        response = await client.get(
-            "https://api.real-debrid.com/oauth/v2/device/code",
-            params={"client_id": client_id}
-        )
-        response.raise_for_status()
-        auth_data = response.json()
-    
-    return templates.TemplateResponse(
-        "device_auth.html", 
-        {
-            "request": request,
-            "user_code": auth_data.get("user_code"),
-            "device_code": auth_data.get("device_code"),
-            "verification_url": auth_data.get("verification_url"),
-            "expires_in": auth_data.get("expires_in", 1800)
-        }
-    )
+class ApiResponse(BaseModel):
+    success: bool
+    message: Optional[str] = None
+    data: Optional[Any] = None
 
-
-@app.get("/check-device-auth")
-async def check_device_auth(request: Request, device_code: str):
-    client_id = os.environ.get("RD_CLIENT_ID")
-    client_secret = os.environ.get("RD_CLIENT_SECRET")
-
-    if not client_id or not client_secret:
-        return "<div class='text-red-500 font-bold'>Configuration serveur incorrecte : RD_CLIENT_ID ou RD_CLIENT_SECRET manquant.</div>"
-    
-    # Préparer les données pour la requête POST
-    data = {
-        "client_id": client_id,
-        "client_secret": client_secret,
-        "device_code": device_code,
-        "grant_type": "http://oauth.net/grant_type/device/1.0"
-    }
-    
-    async with httpx.AsyncClient() as client:
-        try:
-            response = await client.post(
-                "https://api.real-debrid.com/oauth/v2/token",
-                data=data,
-                headers={"Content-Type": "application/x-www-form-urlencoded"}
-            )
-            
-            if response.status_code == 400:
-                # Vérifier si c'est un authorization_pending
-                error_data = response.json()
-                if error_data.get("error") == "authorization_pending":
-                    return "<p class='text-yellow-600'>En attente de validation...</p>"
-                elif error_data.get("error") == "expired_token":
-                    return "<div class='text-red-500 font-bold'>Le code a expiré. Veuillez recommencer l'authentification.</div>"
-                else:
-                    return f"<div class='text-red-500'>Erreur: {error_data.get('error', 'Erreur inconnue')}</div>"
-            
-            elif response.status_code == 200:
-                # Succès ! Récupérer les tokens
-                token_data = response.json()
-                access_token = token_data.get("access_token")
-                refresh_token = token_data.get("refresh_token")
-                
-                # Afficher dans la console pour le moment
-                print(f"✅ Authentification réussie !")
-                print(f"Access Token: {access_token}")
-                print(f"Refresh Token: {refresh_token}")
-                
-                # TODO: Stocker les tokens de manière sécurisée
-                
-                return "<div class='text-green-500 font-bold text-center p-4'>🎉 Connecté avec succès à Real-Debrid !</div>"
-            
-            else:
-                response.raise_for_status()
-                
-        except httpx.HTTPStatusError as e:
-            return f"<div class='text-red-500'>Erreur HTTP {e.response.status_code}</div>"
-        except Exception as e:
-            return f"<div class='text-red-500'>Erreur de connexion: {str(e)}</div>"
-
-
-# Initialisation async de la base et de la queue au démarrage
+# Initialisation de la base de données
 @app.on_event("startup")
 async def startup_event():
-    await init_db()
-    await init_queue_table()
+    print("Redriva API démarrage...")
 
-DB_PATH = "data/redriva.db"
-
-# Schéma Pydantic file d'attente
-class QueueItem(BaseModel):
-    torrent_id: str
-    priority: int = 10
-    status: str = "pending"
-
-class QueueUpdate(BaseModel):
-    priority: Optional[int] = None
-    status: Optional[str] = None
-
-from fastapi import status
-from src.services import fetch_torrents, add_torrent_rd
-from src.logging_utils import log_info, log_error, log_access
-from src.ratelimit_utils import rate_limited
-
-# --- Endpoints file d'attente (async only) ---
-# --- Endpoints torrents (fusionnés) ---
-@app.get("/api/torrents")
-@rate_limited("/api/torrents")
-async def get_torrents(request: Request):
-    log_access("/api/torrents")
-    try:
-        torrents = await fetch_torrents()
-        await save_torrents(torrents)
-        log_info(f"Torrents récupérés et stockés: {len(torrents)}")
-        return {"success": True, "data": torrents, "error": None}
-    except Exception as e:
-        log_error(f"Erreur /api/torrents: {e}")
-        return JSONResponse(content={"success": False, "data": None, "error": str(e)}, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-@app.post("/api/torrents")
-@rate_limited("/api/torrents")
-async def add_torrent(request: Request, body: dict = Body(...)):
-    log_access("POST /api/torrents")
-    try:
-        magnet = body.get("magnet")
-        if not magnet:
-            return JSONResponse(content={"success": False, "error": "Champ 'magnet' requis."}, status_code=status.HTTP_400_BAD_REQUEST)
-        result = await add_torrent_rd(magnet)
-        log_info(f"Ajout torrent RD: {magnet} => {result}")
-        return {"success": True, "data": result, "error": None}
-    except Exception as e:
-        log_error(f"Erreur POST /api/torrents: {e}")
-        return JSONResponse(content={"success": False, "error": str(e)}, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
-@app.get("/api/queue")
-@rate_limited("/api/queue")
-async def get_queue(request: Request):
-    log_access("/api/queue")
-    try:
-        queue = await get_all_queue()
-        return queue
-    except Exception as e:
-        log_error(f"Erreur GET /api/queue: {e}")
-        return JSONResponse(content={"success": False, "error": str(e)}, status_code=500)
-
-# Exemple d'utilisation de la persistance async pour les torrents (à adapter selon les besoins)
-@app.get("/api/torrents/local")
-async def get_local_torrents():
-    torrents = await get_all_torrents()
-    return {"success": True, "data": torrents, "error": None}
-
-@app.post("/api/queue")
-@rate_limited("/api/queue")
-async def add_to_queue(item: QueueItem, request: Request):
-    log_access("POST /api/queue")
-    try:
-        queue_id = await persist_add_to_queue(item.torrent_id, item.priority, item.status)
-        log_info(f"Ajout file d'attente: {item.torrent_id} (prio {item.priority})")
-        return {"id": queue_id}
-    except Exception as e:
-        log_error(f"Erreur POST /api/queue: {e}")
-        return JSONResponse(content={"success": False, "error": str(e)}, status_code=500)
-
-@app.patch("/api/queue/{queue_id}")
-@rate_limited("/api/queue")
-async def update_queue(queue_id: int, item: QueueUpdate, request: Request):
-    log_access(f"PATCH /api/queue/{queue_id}")
-    if item.priority is None and item.status is None:
-        log_error("PATCH /api/queue: aucune donnée à mettre à jour")
-        raise HTTPException(status_code=400, detail="Aucune donnée à mettre à jour")
-    try:
-        rowcount = await persist_update_queue(queue_id, item.priority, item.status)
-        if rowcount == 0:
-            log_error(f"PATCH /api/queue: job {queue_id} non trouvé")
-            raise HTTPException(status_code=404, detail="Job non trouvé")
-        log_info(f"Maj file d'attente {queue_id}: prio={item.priority}, status={item.status}")
-        return {"success": True}
-    except Exception as e:
-        log_error(f"Erreur PATCH /api/queue/{queue_id}: {e}")
-        return JSONResponse(content={"success": False, "error": str(e)}, status_code=500)
-
-@app.delete("/api/queue/{queue_id}")
-@rate_limited("/api/queue")
-async def delete_queue(queue_id: int, request: Request):
-    log_access(f"DELETE /api/queue/{queue_id}")
-    try:
-        rowcount = await persist_delete_queue(queue_id)
-        if rowcount == 0:
-            log_error(f"DELETE /api/queue: job {queue_id} non trouvé")
-            raise HTTPException(status_code=404, detail="Job non trouvé")
-        log_info(f"Suppression file d'attente {queue_id}")
-        return {"success": True}
-    except Exception as e:
-        log_error(f"Erreur DELETE /api/queue/{queue_id}: {e}")
-        return JSONResponse(content={"success": False, "error": str(e)}, status_code=500)
-
-# --- Gestion de l'état de mise à jour des détails torrents (lock file) ---
-UPDATE_LOCK_PATH = os.path.join("data", ".update_torrents.lock")
-UPDATE_STATUS_PATH = os.path.join("data", ".update_torrents.status")
-UPDATE_PROGRESS_PATH = os.path.join("data", ".update_torrents.progress")
-UPDATE_LOG_PATH = os.path.join("data", ".update_torrents.log")
-
-def set_update_progress(progress: int, total: int):
-    with open(UPDATE_PROGRESS_PATH, "w") as f:
-        f.write(f"{progress}/{total}")
-
-def get_update_progress():
-    if os.path.exists(UPDATE_PROGRESS_PATH):
-        with open(UPDATE_PROGRESS_PATH) as f:
-            val = f.read().strip()
-            try:
-                done, total = map(int, val.split("/"))
-                return {"done": done, "total": total}
-            except Exception:
-                return {"done": 0, "total": 0}
-    return {"done": 0, "total": 0}
-
-def append_update_log(line: str):
-    with open(UPDATE_LOG_PATH, "a") as f:
-        f.write(line.rstrip("\n") + "\n")
-
-def get_update_log(tail=100):
-    if not os.path.exists(UPDATE_LOG_PATH):
-        return []
-    with open(UPDATE_LOG_PATH) as f:
-        lines = f.readlines()
-    return lines[-tail:]
-
-def is_update_running():
-    return os.path.exists(UPDATE_LOCK_PATH)
-
-def set_update_status(status: str):
-    with open(UPDATE_STATUS_PATH, "w") as f:
-        f.write(status)
-
-def get_update_status():
-    if os.path.exists(UPDATE_STATUS_PATH):
-        with open(UPDATE_STATUS_PATH) as f:
-            return f.read().strip()
-    return "idle"
-
-
-# --- Fonctions utilitaires asynchrones pour la synchronisation globale ---
-
-async def get_torrent_ids():
-    async with aiosqlite.connect(DB_PATH) as db:
-        async with db.execute("SELECT id FROM torrents") as cursor:
-            rows = await cursor.fetchall()
-        return [row[0] for row in rows]
-
-async def upsert_torrent_detail(detail):
-    async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute('''INSERT OR REPLACE INTO torrent_details
-            (id, name, status, size, files_count, added, downloaded, speed, progress, hash, original_filename, host, split, links, ended, error, links_count, folder, priority, custom1)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
-            (
-                detail.get('id'),
-                detail.get('filename') or detail.get('name'),
-                detail.get('status'),
-                detail.get('bytes'),
-                len(detail.get('files', [])),
-                detail.get('added'),
-                detail.get('downloaded'),
-                detail.get('speed'),
-                detail.get('progress'),
-                detail.get('hash'),
-                detail.get('original_filename'),
-                detail.get('host'),
-                detail.get('split'),
-                ",".join(detail.get('links', [])) if detail.get('links') else None,
-                detail.get('ended'),
-                detail.get('error'),
-                detail.get('links_count'),
-                detail.get('folder'),
-                detail.get('priority'),
-                None
-            )
-        )
-        await db.commit()
-
-# --- Version 100% async avec aiohttp, asyncio, Body, rate_limit configurable ---
-@app.post("/api/admin/update-torrents")
-@rate_limited("/api/admin/update-torrents")
-async def admin_update_torrents(background_tasks: BackgroundTasks, rate_limit: int = Body(60)):
-    log_access("POST /api/admin/update-torrents")
-    """
-    Lance la mise à jour des détails de tous les torrents (async, aiohttp, throttling configurable).
-    """
-    if is_update_running():
-        log_info("Mise à jour déjà en cours.")
-        return {"status": "already_running"}
-    async def update_all():
-        try:
-            os.makedirs("data", exist_ok=True)
-            with open(UPDATE_LOCK_PATH, "w") as f:
-                f.write("running")
-            set_update_status("running")
-            for p in [UPDATE_PROGRESS_PATH, UPDATE_LOG_PATH]:
-                if os.path.exists(p):
-                    os.remove(p)
-            torrent_ids = await get_torrent_ids()
-            total = len(torrent_ids)
-            set_update_progress(0, total)
-            append_update_log(f"Mise à jour de {total} torrents (async, {rate_limit} req/min)...")
-            import os as _os
-            RD_TOKEN = _os.environ.get("RD_TOKEN", "")
-            if not RD_TOKEN:
-                append_update_log("[ERREUR] Token Real-Debrid manquant.")
-                set_update_status("error: token missing")
-                log_error("Token Real-Debrid manquant pour update-torrents.")
-                return
-            headers = {"Authorization": f"Bearer {RD_TOKEN}"}
-            sem = asyncio.Semaphore(rate_limit)
-            delay = 60.0 / rate_limit if rate_limit > 0 else 1.0
-            async def fetch_detail(idx, tid):
-                url = f"https://api.real-debrid.com/rest/1.0/torrents/info/{tid}"
-                for attempt in range(3):
-                    try:
-                        async with sem:
-                            async with aiohttp.ClientSession() as session:
-                                async with session.get(url, headers=headers, timeout=20) as resp:
-                                    if resp.status == 429:
-                                        append_update_log(f"Quota API atteint, pause 10s...")
-                                        await asyncio.sleep(10)
-                                        continue
-                                    if resp.status == 404:
-                                        append_update_log(f"[404] Torrent {tid} introuvable.")
-                                        return
-                                    resp.raise_for_status()
-                                    detail = await resp.json()
-                                    await upsert_torrent_detail(detail)
-                                    append_update_log(f"{idx+1}/{total} - {tid} OK")
-                                    return
-                    except Exception as e:
-                        append_update_log(f"{idx+1}/{total} - {tid} ERREUR: {e}")
-                        await asyncio.sleep(2)
-                append_update_log(f"Echec récupération détail pour {tid}")
-            tasks = []
-            for idx, tid in enumerate(torrent_ids):
-                tasks.append(fetch_detail(idx, tid))
-                await asyncio.sleep(delay)
-                set_update_progress(idx+1, total)
-            await asyncio.gather(*tasks)
-            set_update_status("done")
-            append_update_log("Mise à jour terminée.")
-            log_info("Mise à jour des torrents terminée.")
-        except Exception as e:
-            set_update_status(f"error: {e}")
-            append_update_log(f"[ERREUR] Lancement update: {e}")
-            log_error(f"Erreur update-torrents: {e}")
-        finally:
-            if os.path.exists(UPDATE_LOCK_PATH):
-                os.remove(UPDATE_LOCK_PATH)
-    background_tasks.add_task(update_all)
-    return {"status": "started"}
-
-# --- Endpoint de synchronisation globale (sans rate_limit, pour sync RD → SQLite) ---
-@app.post("/api/admin/sync")
-@rate_limited("/api/admin/sync")
-async def admin_sync(background_tasks: BackgroundTasks):
-    log_access("POST /api/admin/sync")
-    """
-    Lance la synchronisation globale RD → SQLite (récupère la liste des torrents, sans throttling).
-    """
-    if is_sync_running():
-        log_info("Synchronisation déjà en cours.")
-        return {"status": "already_running"}
-    async def sync_all():
-        try:
-            os.makedirs("data", exist_ok=True)
-            with open(SYNC_LOCK_PATH, "w") as f:
-                f.write("running")
-            set_sync_status("running")
-            for p in [SYNC_PROGRESS_PATH, SYNC_LOG_PATH]:
-                if os.path.exists(p):
-                    os.remove(p)
-            # Ici, appeler l'API Real-Debrid pour récupérer tous les torrents (pagination)
-            # et les insérer dans la table torrents (utiliser aiosqlite)
-            # ... (logique existante à réintégrer, à adapter async)
-            set_sync_status("done")
-            append_sync_log("Synchronisation terminée.")
-            log_info("Synchronisation RD → SQLite terminée.")
-        except Exception as e:
-            set_sync_status(f"error: {e}")
-            append_sync_log(f"[ERREUR] Lancement sync: {e}")
-            log_error(f"Erreur synchronisation RD → SQLite: {e}")
-        finally:
-            if os.path.exists(SYNC_LOCK_PATH):
-                os.remove(SYNC_LOCK_PATH)
-    background_tasks.add_task(sync_all)
-    return {"status": "started"}
-
-# --- Gestion de l'état de synchronisation (lock file) ---
-SYNC_LOCK_PATH = os.path.join("data", ".sync_rd.lock")
-SYNC_STATUS_PATH = os.path.join("data", ".sync_rd.status")
-SYNC_PROGRESS_PATH = os.path.join("data", ".sync_rd.progress")
-SYNC_LOG_PATH = os.path.join("data", ".sync_rd.log")
-def set_sync_progress(progress: int, total: int):
-    with open(SYNC_PROGRESS_PATH, "w") as f:
-        f.write(f"{progress}/{total}")
-
-def get_sync_progress():
-    if os.path.exists(SYNC_PROGRESS_PATH):
-        with open(SYNC_PROGRESS_PATH) as f:
-            val = f.read().strip()
-            try:
-                done, total = map(int, val.split("/"))
-                return {"done": done, "total": total}
-            except Exception:
-                return {"done": 0, "total": 0}
-    return {"done": 0, "total": 0}
-
-def append_sync_log(line: str):
-    with open(SYNC_LOG_PATH, "a") as f:
-        f.write(line.rstrip("\n") + "\n")
-
-def get_sync_log(tail=100):
-    if not os.path.exists(SYNC_LOG_PATH):
-        return []
-    with open(SYNC_LOG_PATH) as f:
-        lines = f.readlines()
-    return lines[-tail:]
-
-def is_sync_running():
-    return os.path.exists(SYNC_LOCK_PATH)
-
-def set_sync_status(status: str):
-    with open(SYNC_STATUS_PATH, "w") as f:
-        f.write(status)
-
-def get_sync_status():
-    if os.path.exists(SYNC_STATUS_PATH):
-        with open(SYNC_STATUS_PATH) as f:
-            return f.read().strip()
-    return "idle"
-
-# Endpoint pour aide & support (exemple statique)
-@app.get("/api/support")
-@rate_limited("/api/support")
-async def get_support(request: Request):
-    log_access("GET /api/support")
-    try:
-        return {
-            "faq": [
-                {"q": "Comment ajouter un torrent ?", "a": "Utilisez le bouton 'Ajouter' sur le dashboard ou la page Torrents."},
-                {"q": "Où trouver mon token Real-Debrid ?", "a": "Connectez-vous sur real-debrid.com, section 'Mon compte' > 'Applications'"},
-                {"q": "Comment signaler un bug ?", "a": "Ouvrez une issue sur GitHub ou contactez le support via le formulaire."}
-            ],
-            "links": [
-                {"label": "Documentation", "url": "https://github.com/kesurof/redriva#readme"},
-                {"label": "FAQ complète", "url": "https://github.com/kesurof/redriva/wiki/FAQ"},
-                {"label": "Support GitHub", "url": "https://github.com/kesurof/redriva/issues"}
-            ]
-        }
-    except Exception as e:
-        log_error(f"Erreur GET /api/support: {e}")
-        return JSONResponse(content={"success": False, "error": str(e)}, status_code=500)
-# Endpoint pour informations système (exemple statique)
-@app.get("/api/system")
-@rate_limited("/api/system")
-async def get_system_info(request: Request):
-    log_access("GET /api/system")
-    try:
-        return {
-            "version": "1.0.0",
-            "backend_status": "ok",
-            "last_backup": "2025-07-17T23:59:00"
-        }
-    except Exception as e:
-        log_error(f"Erreur GET /api/system: {e}")
-        return JSONResponse(content={"success": False, "error": str(e)}, status_code=500)
-# Endpoint pour l'utilisation des quotas Real-Debrid (exemple statique)
-@app.get("/api/quotas")
-@rate_limited("/api/quotas")
-async def get_quotas(request: Request):
-    log_access("GET /api/quotas")
-    try:
-        # À remplacer par un appel réel à l'API Real-Debrid
-        return {
-            "quota_rest": 12,  # en Go
-            "slots_used": 3,
-            "slots_total": 5
-        }
-    except Exception as e:
-        log_error(f"Erreur GET /api/quotas: {e}")
-        return JSONResponse(content={"success": False, "error": str(e)}, status_code=500)
-
-# Endpoint pour logs récents (exemple statique)
-@app.get("/api/logs")
-@rate_limited("/api/logs")
-async def get_logs(request: Request):
-    log_access("GET /api/logs")
-    try:
-        # À remplacer par lecture réelle des logs
-        return {
-            "logs": [
-                {"timestamp": "2025-07-18T10:12:00", "level": "INFO", "message": "Démarrage du backend"},
-                {"timestamp": "2025-07-18T10:13:12", "level": "WARNING", "message": "Quota presque atteint"},
-                {"timestamp": "2025-07-18T10:14:01", "level": "ERROR", "message": "Erreur API Real-Debrid"}
-            ]
-        }
-    except Exception as e:
-        log_error(f"Erreur GET /api/logs: {e}")
-        return JSONResponse(content={"success": False, "error": str(e)}, status_code=500)
-
-@app.get("/api/ping")
-@rate_limited("/api/ping")
-async def ping(request: Request):
-    log_access("GET /api/ping")
-    try:
-        return {"status": "ok"}
-    except Exception as e:
-        log_error(f"Erreur GET /api/ping: {e}")
-        return JSONResponse(content={"success": False, "error": str(e)}, status_code=500)
-
-# ===== NOUVELLES ROUTES POUR L'INTERFACE PRINCIPALE =====
-
-def generate_fake_torrents(count=25):
-    """Génère de faux torrents pour le développement"""
-    import random
-    from datetime import datetime, timedelta
-    
-    names = [
-        "Ubuntu.22.04.3.Desktop.amd64", "The.Movie.2023.1080p.BluRay.x264",
-        "TV.Show.S01E01.1080p.WEB.x264", "Game.Setup.v1.2.3", "Album.Artist.2023.FLAC",
-        "Documentary.2023.720p.HDTV.x264", "Software.Pro.v10.2.Cracked",
-        "Movie.Sequel.2023.2160p.UHD.BluRay.x265", "Series.S02.Complete.1080p.WEB",
-        "Anime.Movie.2023.1080p.BluRay", "Music.Collection.320kbps.MP3"
-    ]
-    
-    categories = ["Movies", "TV Shows", "Software", "Games", "Music", "Books", "Anime"]
-    statuses = ["downloaded", "downloading", "queued", "paused", "error"]
-    states = ["downloading", "seeding", "paused", "completed", "error"]
-    
+# Fonction utilitaire pour générer des torrents factices
+def generate_fake_torrents(count: int = 10) -> List[TorrentResponse]:
+    """Génère des torrents factices pour le développement"""
     torrents = []
+    base_names = [
+        "Ubuntu.22.04.LTS.Desktop", "Debian.12.Bookworm.DVD", "Fedora.39.Workstation",
+        "Linux.Mint.21.Cinnamon", "PopOS.22.04.LTS", "Elementary.OS.7", "Manjaro.KDE.Plasma",
+        "OpenSUSE.Leap.15.5", "CentOS.Stream.9", "Arch.Linux.2024"
+    ]
+    statuses = ["downloading", "queued", "seeding", "error", "completed"]
+    states = ["active", "paused", "stopped"]
+    categories = ["OS", "Software", "Media", "Games", "Books"]
+    
     for i in range(count):
-        base_name = random.choice(names)
-        torrent = {
-            "id": f"rd_{i+1:03d}",
-            "name": f"{base_name}.{random.randint(1000, 9999)}",
-            "title": f"{base_name}.{random.randint(1000, 9999)}",
-            "size": f"{random.uniform(0.5, 50):.1f} GB",
-            "status": random.choice(statuses),
-            "state": random.choice(states),
-            "progress": random.randint(0, 100),
-            "speed": f"{random.uniform(0, 10):.1f} MB/s" if random.choice([True, False]) else "0 B/s",
-            "category": random.choice(categories),
-            "seeders": random.randint(0, 1000),
-            "added_date": (datetime.now() - timedelta(days=random.randint(0, 30))).strftime("%d/%m/%Y %H:%M"),
-            "hash": f"{''.join(random.choices('abcdef0123456789', k=40))}",
-            "magnet_url": f"magnet:?xt=urn:btih:{''.join(random.choices('abcdef0123456789', k=40))}&dn={base_name}"
-        }
+        base_name = random.choice(base_names)
+        torrent = TorrentResponse(
+            id=str(i),
+            name=f"{base_name}.{random.randint(1000, 9999)}",
+            title=f"{base_name}.{random.randint(1000, 9999)}",
+            size=f"{random.uniform(0.5, 50):.1f} GB",
+            status=random.choice(statuses),
+            state=random.choice(states),
+            progress=random.randint(0, 100),
+            speed=f"{random.uniform(0, 10):.1f} MB/s" if random.choice([True, False]) else "0 B/s",
+            category=random.choice(categories),
+            seeders=random.randint(0, 1000),
+            added_date=(datetime.now() - timedelta(days=random.randint(0, 30))).strftime("%d/%m/%Y %H:%M"),
+            hash=f"{''.join(random.choices('abcdef0123456789', k=40))}",
+            magnet_url=f"magnet:?xt=urn:btih:{''.join(random.choices('abcdef0123456789', k=40))}&dn={base_name}"
+        )
         torrents.append(torrent)
     
     return torrents
 
-@app.get("/")
-async def dashboard(request: Request):
-    torrents = generate_fake_torrents(25)
-    return templates.TemplateResponse("dashboard.html", {"request": request, "torrents": torrents})
+# === ROUTES API ===
 
-@app.get("/torrents")
-async def torrents_page(request: Request):
+@app.get("/api/ping")
+async def ping():
+    """Endpoint de vérification de l'état de l'API"""
+    return {"status": "ok", "timestamp": datetime.now().isoformat()}
+
+@app.get("/api/torrents", response_model=List[TorrentResponse])
+async def get_torrents():
+    """Récupère la liste de tous les torrents"""
+    # Pour le moment, utilise des données factices
+    # TODO: Remplacer par les vraies données de la base
     torrents = generate_fake_torrents(50)
-    return templates.TemplateResponse("torrents.html", {"request": request, "torrents": torrents})
+    return torrents
 
-@app.get("/torrents/{torrent_id}/details")
-async def torrent_details(request: Request, torrent_id: str):
-    # Récupère les détails d'un torrent spécifique
-    all_torrents = generate_fake_torrents(50)
-    torrent = next((t for t in all_torrents if t["id"] == torrent_id), None)
-    
-    if not torrent:
-        raise HTTPException(status_code=404, detail="Torrent not found")
-    
-    return templates.TemplateResponse("torrent_details_modal.html", {"request": request, "torrent": torrent})
+@app.post("/api/torrents", response_model=TorrentResponse)
+async def add_torrent(torrent_data: TorrentCreate):
+    """Ajoute un nouveau torrent"""
+    # TODO: Implémenter la logique d'ajout réel
+    new_torrent = TorrentResponse(
+        id=str(random.randint(1000, 9999)),
+        name=torrent_data.name,
+        title=torrent_data.name,
+        size="0 GB",
+        status="queued",
+        state="paused",
+        progress=0,
+        speed="0 B/s",
+        category="Other",
+        seeders=0,
+        added_date=datetime.now().strftime("%d/%m/%Y %H:%M"),
+        hash=f"{''.join(random.choices('abcdef0123456789', k=40))}",
+        magnet_url=torrent_data.magnet_url or ""
+    )
+    return new_torrent
 
-@app.delete("/torrents/{torrent_id}")
+@app.delete("/api/torrents/{torrent_id}")
 async def delete_torrent(torrent_id: str):
-    # Logique de suppression du torrent
-    # Pour le moment, juste un retour de succès
+    """Supprime un torrent"""
+    # TODO: Implémenter la logique de suppression
     return {"success": True, "message": f"Torrent {torrent_id} supprimé"}
 
-@app.post("/torrents/{torrent_id}/reinsert")
+@app.post("/api/torrents/{torrent_id}/reinsert")
 async def reinsert_torrent(torrent_id: str):
-    # Logique de réinsertion du torrent
+    """Réinsère un torrent dans la queue"""
+    # TODO: Implémenter la logique de réinsertion
     return {"success": True, "message": f"Torrent {torrent_id} réinséré"}
 
-@app.get("/settings")
-async def settings_page(request: Request):
-    # Charge la page settings avec le contenu Debrid par défaut
-    debrid_content = await get_debrid_settings_content()
-    return templates.TemplateResponse("settings.html", {"request": request, "debrid_content": debrid_content})
+@app.get("/api/queue", response_model=List[QueueItemResponse])
+async def get_queue():
+    """Récupère la queue des tâches"""
+    try:
+        # TODO: Remplacer par les vraies données de la base
+        fake_queue = [
+            QueueItemResponse(
+                id=1,
+                status="pending",
+                created_at=datetime.now().isoformat(),
+                updated_at=datetime.now().isoformat(),
+                data={"type": "download", "name": "Example Torrent"}
+            )
+        ]
+        return fake_queue
+    except Exception as e:
+        print(f"Erreur lors de la récupération de la queue: {e}")
+        return []
 
-async def get_debrid_settings_content():
-    """Génère le contenu HTML pour les paramètres Debrid"""
-    # TODO: Récupérer les vraies données de configuration depuis la DB
-    token_configured = False  # await get_setting("rd_token") is not None
-    premium_expiry = None  # await get_rd_premium_info()
-    days_remaining = None
+@app.post("/api/queue", response_model=QueueItemResponse)
+async def add_to_queue(item_data: QueueItemCreate):
+    """Ajoute un élément à la queue"""
+    try:
+        # TODO: Implémenter l'ajout en base de données
+        new_id = random.randint(1000, 9999)
+        return QueueItemResponse(
+            id=new_id,
+            status="pending",
+            created_at=datetime.now().isoformat(),
+            updated_at=datetime.now().isoformat(),
+            data=item_data.data
+        )
+    except Exception as e:
+        print(f"Erreur lors de l'ajout à la queue: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/api/queue/{queue_id}")
+async def delete_from_queue(queue_id: int):
+    """Supprime un élément de la queue"""
+    try:
+        # TODO: Implémenter la suppression en base de données
+        return {"success": True, "message": f"Élément {queue_id} supprimé de la queue"}
+    except Exception as e:
+        print(f"Erreur lors de la suppression de la queue: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/system", response_model=SystemInfoResponse)
+async def get_system_info():
+    """Récupère les informations système"""
+    import psutil
+    import time
     
-    # Pour le développement, simulons des données
-    if token_configured:
-        premium_expiry = "31/12/2024"
-        days_remaining = 45
-    
-    from jinja2 import Template
-    with open("templates/settings_debrid.html", "r", encoding="utf-8") as f:
-        template_content = f.read()
-    
-    template = Template(template_content)
-    return template.render(
-        token_configured=token_configured,
-        premium_expiry=premium_expiry,
-        days_remaining=days_remaining
-    )
+    try:
+        uptime_seconds = time.time() - psutil.boot_time()
+        uptime_hours = int(uptime_seconds // 3600)
+        uptime_minutes = int((uptime_seconds % 3600) // 60)
+        
+        return SystemInfoResponse(
+            cpu_usage=psutil.cpu_percent(interval=1),
+            memory_usage=psutil.virtual_memory().percent,
+            disk_usage=psutil.disk_usage('/').percent,
+            uptime=f"{uptime_hours}h {uptime_minutes}m"
+        )
+    except Exception as e:
+        print(f"Erreur lors de la récupération des infos système: {e}")
+        return SystemInfoResponse(
+            cpu_usage=0.0,
+            memory_usage=0.0,
+            disk_usage=0.0,
+            uptime="Unknown"
+        )
 
-@app.get("/settings/debrid")
-async def settings_debrid(request: Request):
-    content = await get_debrid_settings_content()
-    return content
+@app.get("/api/logs")
+async def get_logs():
+    """Récupère les logs de l'application"""
+    try:
+        log_file_path = "logs/redriva.log"
+        if os.path.exists(log_file_path):
+            with open(log_file_path, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+                # Retourne les 100 dernières lignes
+                return {"logs": lines[-100:]}
+        else:
+            return {"logs": ["Aucun fichier de log trouvé"]}
+    except Exception as e:
+        print(f"Erreur lors de la lecture des logs: {e}")
+        return {"logs": [f"Erreur: {str(e)}"]}
 
-@app.get("/settings/arrs")
-async def settings_arrs(request: Request):
-    return """
-    <div class="space-y-6">
-        <h3 class="text-lg font-medium text-gray-900">Configuration *Arrs</h3>
-        <div class="bg-gray-50 rounded-lg p-4">
-            <p class="text-gray-500">Configuration des applications *Arr à venir...</p>
-        </div>
-    </div>
-    """
+@app.post("/api/admin/update-torrents")
+async def update_torrents(background_tasks: BackgroundTasks):
+    """Met à jour les torrents en arrière-plan"""
+    # TODO: Implémenter la logique de mise à jour
+    background_tasks.add_task(lambda: print("Mise à jour des torrents démarrée"))
+    return {"success": True, "message": "Mise à jour des torrents démarrée"}
 
-@app.get("/settings/repair")
-async def settings_repair(request: Request):
-    return """
-    <div class="space-y-6">
-        <h3 class="text-lg font-medium text-gray-900">Réparation et Maintenance</h3>
-        <div class="bg-gray-50 rounded-lg p-4">
-            <p class="text-gray-500">Outils de réparation et maintenance à venir...</p>
-        </div>
-    </div>
-    """
+@app.post("/api/admin/sync")
+async def sync_with_real_debrid(background_tasks: BackgroundTasks):
+    """Synchronise avec Real-Debrid en arrière-plan"""
+    # TODO: Implémenter la logique de synchronisation
+    background_tasks.add_task(lambda: print("Synchronisation Real-Debrid démarrée"))
+    return {"success": True, "message": "Synchronisation Real-Debrid démarrée"}
 
-@app.post("/settings/debrid/test")
-async def test_debrid_connection():
-    # TODO: Implémenter le test de connexion Real-Debrid
-    return """
-    <div class="mt-3 p-3 bg-green-100 border border-green-300 rounded-md">
-        <p class="text-green-800 text-sm">✓ Connexion Real-Debrid réussie</p>
-    </div>
-    """
+# Routes de fallback pour les anciennes routes (compatibility)
+@app.get("/")
+async def root():
+    """Redirection vers le frontend"""
+    return {"message": "Redriva API - Frontend disponible sur port 5173"}
 
-@app.get("/symlinks")
-async def symlinks_page(request: Request):
-    return templates.TemplateResponse("symlinks.html", {"request": request})
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)

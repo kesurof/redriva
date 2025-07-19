@@ -24,6 +24,28 @@ services:
     labels:
       - "com.redriva.service=backend"
 
+  frontend:
+    container_name: redriva-frontend
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "5173:5173"
+    networks:
+      - redriva-net
+    depends_on:
+      - backend
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=development
+      - VITE_API_URL=http://localhost:8080
+    command: npm run dev -- --host 0.0.0.0 --port 5173
+    labels:
+      - "com.redriva.service=frontend"
+
 networks:
   redriva-net:
     driver: bridge
