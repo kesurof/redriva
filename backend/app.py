@@ -375,7 +375,7 @@ def get_sync_status():
 # Endpoint pour aide & support (exemple statique)
 @app.get("/api/support")
 @rate_limited("/api/support")
-def get_support(request: Request):
+async def get_support(request: Request):
     log_access("GET /api/support")
     try:
         return {
@@ -396,7 +396,7 @@ def get_support(request: Request):
 # Endpoint pour informations système (exemple statique)
 @app.get("/api/system")
 @rate_limited("/api/system")
-def get_system_info(request: Request):
+async def get_system_info(request: Request):
     log_access("GET /api/system")
     try:
         return {
@@ -410,7 +410,7 @@ def get_system_info(request: Request):
 # Endpoint pour l'utilisation des quotas Real-Debrid (exemple statique)
 @app.get("/api/quotas")
 @rate_limited("/api/quotas")
-def get_quotas(request: Request):
+async def get_quotas(request: Request):
     log_access("GET /api/quotas")
     try:
         # À remplacer par un appel réel à l'API Real-Debrid
@@ -426,7 +426,7 @@ def get_quotas(request: Request):
 # Endpoint pour logs récents (exemple statique)
 @app.get("/api/logs")
 @rate_limited("/api/logs")
-def get_logs(request: Request):
+async def get_logs(request: Request):
     log_access("GET /api/logs")
     try:
         # À remplacer par lecture réelle des logs
@@ -443,7 +443,7 @@ def get_logs(request: Request):
 
 @app.get("/api/ping")
 @rate_limited("/api/ping")
-def ping(request: Request):
+async def ping(request: Request):
     log_access("GET /api/ping")
     try:
         return {"status": "ok"}

@@ -12,6 +12,7 @@ RATE_PERIOD = 60  # secondes
 _rate_limit_store = {}
 
 def rate_limited(endpoint_name: str):
+    import inspect
     def decorator(func: Callable):
         @wraps(func)
         async def wrapper(*args, **kwargs):
@@ -31,6 +32,10 @@ def rate_limited(endpoint_name: str):
                 raise HTTPException(status_code=429, detail=f"Trop de requêtes sur {endpoint_name}. Réessayez plus tard.")
             timestamps.append(now)
             _rate_limit_store[ip] = timestamps
-            return await func(*args, **kwargs)
+            result = func(*args, **kwargs)
+            import inspect
+            if inspect.isawaitable(result):
+                return await result
+            return result
         return wrapper
     return decorator
