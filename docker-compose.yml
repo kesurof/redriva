@@ -8,12 +8,15 @@ services:
       - ./config/.env
     volumes:
       - ./backend:/app 
-      - ./data:/app/data
-      - ./logs:/app/logs
+      # On lie les volumes nommés définis plus bas
+      - redriva-data:/app/data
+      - redriva-logs:/app/logs
     ports:
       - "8000:8000"
+    # On assigne ce service au réseau que nous définissons
+    networks:
+      - redriva-net
     restart: unless-stopped
-    # Voici la ligne à corriger :
     command: uvicorn app:app --host 0.0.0.0 --port 8000 --reload
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/ping"]
@@ -23,29 +26,16 @@ services:
     labels:
       - "com.redriva.service=backend"
 
-  frontend:
-    container_name: redriva-frontend
-    build: ./frontend
-    command: npm run dev -- --host # Lance le serveur de développement et le rend accessible
-    ports:
-      - "5173:5173" # Port par défaut de Vite/SvelteKit pour le développement
-    depends_on:
-      backend:
-        condition: service_healthy
-    environment:
-      - VITE_API_URL=http://backend:8000
-    volumes:
-      # Synchronise le code du frontend en temps réel pour le développement
-      - ./frontend:/usr/src/app
-      # Isole les node_modules dans le conteneur pour ne pas les avoir en local
-      - /usr/src/app/node_modules
-    restart: unless-stopped
-    # Le healthcheck sur un serveur de dev n'est pas toujours fiable, on peut le commenter
-    # healthcheck:
-    #   test: ["CMD", "curl", "-f", "http://localhost:5173"]
-    #   interval: 30s
-    #   timeout: 10s
-    #   retries: 5
-    labels:
-      - "com.redriva.service=frontend"
+# ===============================================
+# DÉCLARATION EXPLICITE DES RESSOURCES
+# ===============================================
 
+# On définit un réseau commun pour nos services
+networks:
+  redriva-net:
+    driver: bridge
+
+# On définit les volumes pour les données persistantes
+volumes:
+  redriva-data:
+  redriva-logs:
