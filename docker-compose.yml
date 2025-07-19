@@ -2,17 +2,19 @@ services:
   backend:
     container_name: redriva-backend
     build:
-      context: .
-      dockerfile: backend/Dockerfile
+      context: ./backend
+      dockerfile: Dockerfile 
     env_file:
-      - ./config/.env # Charge les secrets depuis un fichier .env sécurisé
+      - ./config/.env
     volumes:
-      - ./backend:/app # Synchronise le code du backend en temps réel
+      - ./backend:/app 
       - ./data:/app/data
       - ./logs:/app/logs
     ports:
       - "8000:8000"
     restart: unless-stopped
+    # Voici la ligne à corriger :
+    command: uvicorn app:app --host 0.0.0.0 --port 8000 --reload
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/ping"]
       interval: 30s

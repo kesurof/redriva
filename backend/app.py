@@ -10,9 +10,7 @@ from pydantic import BaseModel, Field
 from typing import Optional
 
 # Importe la persistance asynchrone
-import sys
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), 'src')))
-from persistence import init_db, save_torrents, get_all_torrents, init_queue_table, get_all_queue, add_to_queue as persist_add_to_queue, update_queue as persist_update_queue, delete_queue as persist_delete_queue
+from src.persistence import init_db, save_torrents, get_all_torrents, init_queue_table, get_all_queue, add_to_queue as persist_add_to_queue, update_queue as persist_update_queue, delete_queue as persist_delete_queue
 
 
 app = FastAPI()
@@ -37,9 +35,9 @@ class QueueUpdate(BaseModel):
     status: Optional[str] = None
 
 from fastapi import status
-from services import fetch_torrents, add_torrent_rd
-from logging_utils import log_info, log_error, log_access
-from ratelimit_utils import rate_limited
+from src.services import fetch_torrents, add_torrent_rd
+from src.logging_utils import log_info, log_error, log_access
+from src.ratelimit_utils import rate_limited
 
 # --- Endpoints file d'attente (async only) ---
 # --- Endpoints torrents (fusionnés) ---

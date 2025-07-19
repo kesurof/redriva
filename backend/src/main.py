@@ -1,6 +1,6 @@
 # Point d'entrée pour lancer l'API Redriva avec uvicorn
 import uvicorn
-from api import app
+from .api import app
 import os
 
 if __name__ == "__main__":

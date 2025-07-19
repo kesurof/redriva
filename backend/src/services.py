@@ -1,6 +1,6 @@
 # Services métier pour Redriva
 
-from utils import get_rd_token
+from .utils import get_rd_token
 import aiohttp
 import asyncio
 
