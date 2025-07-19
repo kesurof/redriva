@@ -1,5 +1,11 @@
 <script>
-  import { t } from 'svelte-i18n';
+  import { t, init, getLocaleFromNavigator } from 'svelte-i18n';
+  // Initialisation i18n dès le chargement
+  init({
+    fallbackLocale: 'fr',
+    initialLocale: getLocaleFromNavigator() || 'fr'
+  });
+
   $: torrentsLabel = $t('torrents') || 'Torrents';
   $: downloadsLabel = $t('downloads') || 'Téléchargements';
   $: scraperLabel = $t('scraper') || 'Scraper';
