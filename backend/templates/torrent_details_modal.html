@@ -1,73 +1,63 @@
-<!-- Modal Background -->
-<div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50" id="modal-overlay">
-    <div class="relative top-20 mx-auto p-5 border w-11/12 max-w-2xl shadow-lg rounded-md bg-white">
-        <!-- Modal Header -->
-        <div class="flex justify-between items-center pb-3 border-b">
-            <h3 class="text-lg font-semibold">Détails du Torrent</h3>
-            <button class="text-gray-400 hover:text-gray-600" onclick="document.getElementById('modal-container').innerHTML = ''">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                </svg>
-            </button>
+<!-- Modal Header -->
+<div class="flex justify-between items-center pb-3 border-b border-gray-200 dark:border-gray-700">
+    <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Détails du Torrent</h3>
+</div>
+
+<!-- Modal Content -->
+<div class="mt-4 space-y-4">
+    <div>
+        <h4 class="font-medium text-gray-900 dark:text-gray-100">{{ torrent.name }}</h4>
+        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1 font-mono">{{ torrent.hash }}</p>
+    </div>
+    
+    <div class="grid grid-cols-2 gap-4 text-sm">
+        <div>
+            <span class="font-medium text-gray-600 dark:text-gray-400">Taille:</span>
+            <span class="ml-2 text-gray-900 dark:text-gray-200">{{ torrent.size }}</span>
         </div>
-        
-        <!-- Modal Content -->
-        <div class="mt-4 space-y-4">
-            <div>
-                <h4 class="font-medium text-gray-900">{{ torrent.name }}</h4>
-                <p class="text-sm text-gray-500 mt-1">{{ torrent.hash }}</p>
-            </div>
-            
-            <div class="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                    <span class="font-medium text-gray-700">Taille:</span>
-                    <span class="ml-2 text-gray-900">{{ torrent.size }}</span>
-                </div>
-                <div>
-                    <span class="font-medium text-gray-700">Statut:</span>
-                    <span class="ml-2 text-gray-900">{{ torrent.status }}</span>
-                </div>
-                <div>
-                    <span class="font-medium text-gray-700">Seeders:</span>
-                    <span class="ml-2 text-gray-900">{{ torrent.seeders }}</span>
-                </div>
-                <div>
-                    <span class="font-medium text-gray-700">Ajouté le:</span>
-                    <span class="ml-2 text-gray-900">{{ torrent.added_date }}</span>
-                </div>
-            </div>
-            
-            {% if torrent.magnet_url %}
-            <div>
-                <span class="font-medium text-gray-700">Magnet URL:</span>
-                <div class="mt-1 p-2 bg-gray-100 rounded text-xs font-mono break-all">
-                    {{ torrent.magnet_url }}
-                </div>
-            </div>
-            {% endif %}
+        <div>
+            <span class="font-medium text-gray-600 dark:text-gray-400">Statut:</span>
+            <span class="ml-2 text-gray-900 dark:text-gray-200">{{ torrent.status }}</span>
         </div>
-        
-        <!-- Modal Actions -->
-        <div class="flex justify-end space-x-3 pt-4 border-t mt-6">
-            <button onclick="navigator.clipboard.writeText('{{ torrent.id }}')" 
-                    class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded text-sm">
-                Copy ID
-            </button>
-            {% if torrent.magnet_url %}
-            <button onclick="navigator.clipboard.writeText('{{ torrent.magnet_url }}')" 
-                    class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm">
-                Copy Magnet URL
-            </button>
-            {% endif %}
-            <button onclick="navigator.clipboard.writeText('{{ torrent.hash }}')" 
-                    class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded text-sm">
-                Copy Hash
-            </button>
-            <button hx-delete="/torrents/{{ torrent.id }}" 
-                    hx-confirm="Êtes-vous sûr de vouloir supprimer ce torrent ?"
-                    class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded text-sm">
-                Delete
-            </button>
+        <div>
+            <span class="font-medium text-gray-600 dark:text-gray-400">Seeders:</span>
+            <span class="ml-2 text-gray-900 dark:text-gray-200">{{ torrent.seeders }}</span>
+        </div>
+        <div>
+            <span class="font-medium text-gray-600 dark:text-gray-400">Ajouté le:</span>
+            <span class="ml-2 text-gray-900 dark:text-gray-200">{{ torrent.added_date }}</span>
         </div>
     </div>
+    
+    {% if torrent.magnet_url %}
+    <div>
+        <span class="font-medium text-gray-600 dark:text-gray-400">Magnet URL:</span>
+        <div class="mt-1 p-2 bg-gray-100 dark:bg-gray-700 rounded text-xs font-mono break-all text-gray-700 dark:text-gray-300">
+            {{ torrent.magnet_url }}
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Modal Actions -->
+<div class="flex justify-end space-x-3 pt-4 border-t border-gray-200 dark:border-gray-700 mt-6">
+    <button onclick="navigator.clipboard.writeText('{{ torrent.id }}')" 
+            class="bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 text-gray-800 dark:text-gray-200 px-4 py-2 rounded-md text-sm font-medium transition-colors">
+        Copy ID
+    </button>
+    {% if torrent.magnet_url %}
+    <button onclick="navigator.clipboard.writeText('{{ torrent.magnet_url }}')" 
+            class="bg-blue-100 dark:bg-blue-900 hover:bg-blue-200 dark:hover:bg-blue-800 text-blue-800 dark:text-blue-200 px-4 py-2 rounded-md text-sm font-medium transition-colors">
+        Copy Magnet URL
+    </button>
+    {% endif %}
+    <button onclick="navigator.clipboard.writeText('{{ torrent.hash }}')" 
+            class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
+        Copy Hash
+    </button>
+    <button hx-delete="/torrents/{{ torrent.id }}" 
+            hx-confirm="Êtes-vous sûr de vouloir supprimer ce torrent ?"
+            class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
+        Delete
+    </button>
 </div>
