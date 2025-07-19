@@ -4,8 +4,6 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile 
-    env_file:
-      - ./config/.env
     volumes:
       - ./backend:/app 
       - redriva-data:/app/data
