@@ -4,16 +4,124 @@ import os
 import asyncio
 import aiosqlite
 import aiohttp
-from fastapi import FastAPI, Request, BackgroundTasks, Body, HTTPException
+import httpx
+from fastapi import FastAPI, Request, BackgroundTasks, Body, HTTPException, Form
 from fastapi.responses import JSONResponse
+from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
 from typing import Optional
 
 # Importe la persistance asynchrone
-from src.persistence import init_db, save_torrents, get_all_torrents, init_queue_table, get_all_queue, add_to_queue as persist_add_to_queue, update_queue as persist_update_queue, delete_queue as persist_delete_queue
+from src.persistence import init_db, save_torrents, get_all_torrents, init_queue_table, get_all_queue, add_to_queue as persist_add_to_queue, update_queue as persist_update_queue, delete_queue as persist_delete_queue, add_torrent as persist_add_torrent
 
 
 app = FastAPI()
+
+# Configuration des templates Jinja2
+templates = Jinja2Templates(directory="templates")
+
+@app.get("/")
+async def read_root(request: Request):
+    return templates.TemplateResponse("base.html", {"request": request})
+
+@app.get("/load-data")
+async def load_data(request: Request):
+    torrents = await get_all_torrents()
+    return templates.TemplateResponse("data_content.html", {"request": request, "torrents": torrents})
+
+@app.get("/add-torrent-form")
+async def add_torrent_form(request: Request):
+    return templates.TemplateResponse("add_torrent_form.html", {"request": request})
+
+@app.post("/add-torrent")
+async def add_torrent(request: Request, torrent_name: str = Form()):
+    # Ajouter le nouveau torrent en base de données
+    await persist_add_torrent(torrent_name)
+    
+    # On renvoie la liste mise à jour des torrents
+    torrents = await get_all_torrents()
+    return templates.TemplateResponse("data_content.html", {"request": request, "torrents": torrents})
+
+@app.get("/start-device-auth")
+async def start_device_auth(request: Request):
+    client_id = "X245A4XAIBGVM"
+    
+    async with httpx.AsyncClient() as client:
+        response = await client.get(
+            "https://api.real-debrid.com/oauth/v2/device/code",
+            params={"client_id": client_id}
+        )
+        response.raise_for_status()
+        auth_data = response.json()
+    
+    return templates.TemplateResponse(
+        "device_auth.html", 
+        {
+            "request": request,
+            "user_code": auth_data.get("user_code"),
+            "device_code": auth_data.get("device_code"),
+            "verification_url": auth_data.get("verification_url"),
+            "expires_in": auth_data.get("expires_in", 1800)
+        }
+    )
+
+
+@app.get("/check-device-auth")
+async def check_device_auth(request: Request, device_code: str):
+    client_id = os.environ.get("RD_CLIENT_ID")
+    client_secret = os.environ.get("RD_CLIENT_SECRET")
+
+    if not client_id or not client_secret:
+        return "<div class='text-red-500 font-bold'>Configuration serveur incorrecte : RD_CLIENT_ID ou RD_CLIENT_SECRET manquant.</div>"
+    
+    # Préparer les données pour la requête POST
+    data = {
+        "client_id": client_id,
+        "client_secret": client_secret,
+        "device_code": device_code,
+        "grant_type": "http://oauth.net/grant_type/device/1.0"
+    }
+    
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.post(
+                "https://api.real-debrid.com/oauth/v2/token",
+                data=data,
+                headers={"Content-Type": "application/x-www-form-urlencoded"}
+            )
+            
+            if response.status_code == 400:
+                # Vérifier si c'est un authorization_pending
+                error_data = response.json()
+                if error_data.get("error") == "authorization_pending":
+                    return "<p class='text-yellow-600'>En attente de validation...</p>"
+                elif error_data.get("error") == "expired_token":
+                    return "<div class='text-red-500 font-bold'>Le code a expiré. Veuillez recommencer l'authentification.</div>"
+                else:
+                    return f"<div class='text-red-500'>Erreur: {error_data.get('error', 'Erreur inconnue')}</div>"
+            
+            elif response.status_code == 200:
+                # Succès ! Récupérer les tokens
+                token_data = response.json()
+                access_token = token_data.get("access_token")
+                refresh_token = token_data.get("refresh_token")
+                
+                # Afficher dans la console pour le moment
+                print(f"✅ Authentification réussie !")
+                print(f"Access Token: {access_token}")
+                print(f"Refresh Token: {refresh_token}")
+                
+                # TODO: Stocker les tokens de manière sécurisée
+                
+                return "<div class='text-green-500 font-bold text-center p-4'>🎉 Connecté avec succès à Real-Debrid !</div>"
+            
+            else:
+                response.raise_for_status()
+                
+        except httpx.HTTPStatusError as e:
+            return f"<div class='text-red-500'>Erreur HTTP {e.response.status_code}</div>"
+        except Exception as e:
+            return f"<div class='text-red-500'>Erreur de connexion: {str(e)}</div>"
 
 
 # Initialisation async de la base et de la queue au démarrage

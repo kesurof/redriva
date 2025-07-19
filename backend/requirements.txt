@@ -4,3 +4,7 @@ aiohttp
 aiosqlite
 pydantic
 python-dotenv
+jinja2
+python-multipart
+pytest
+httpx

@@ -72,6 +72,34 @@ async def get_all_torrents():
             for row in rows
         ]
 
+async def add_torrent(name: str):
+    """Ajoute un nouveau torrent en base de données avec des valeurs par défaut."""
+    import uuid
+    import time
+    
+    db_path = get_db_path()
+    torrent_id = str(uuid.uuid4())
+    current_time = int(time.time())
+    
+    async with aiosqlite.connect(db_path) as db:
+        await db.execute(
+            """
+            INSERT INTO torrents (id, filename, status, size, added, links, details)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                torrent_id,
+                name,
+                "pending",
+                0,
+                current_time,
+                None,
+                None
+            )
+        )
+        await db.commit()
+    return torrent_id
+
 
 # --- Gestion asynchrone de la file d'attente (queue) ---
 async def init_queue_table():

@@ -8,12 +8,10 @@ services:
       - ./config/.env
     volumes:
       - ./backend:/app 
-      # On lie les volumes nommés définis plus bas
       - redriva-data:/app/data
       - redriva-logs:/app/logs
     ports:
-      - "8000:8000"
-    # On assigne ce service au réseau que nous définissons
+      - "8080:8000"
     networks:
       - redriva-net
     restart: unless-stopped
@@ -26,16 +24,10 @@ services:
     labels:
       - "com.redriva.service=backend"
 
-# ===============================================
-# DÉCLARATION EXPLICITE DES RESSOURCES
-# ===============================================
-
-# On définit un réseau commun pour nos services
 networks:
   redriva-net:
     driver: bridge
 
-# On définit les volumes pour les données persistantes
 volumes:
   redriva-data:
   redriva-logs:
