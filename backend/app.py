@@ -6,6 +6,15 @@ from fastapi import FastAPI, BackgroundTasks, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
+import logging
+
+# Import de nos services
+from services.realdebrid import rd_client
+from services.data_mapper import map_rd_torrent_to_response, map_rd_torrent_detail_to_response
+
+# Configuration du logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Redriva API", version="1.0.0")
 
@@ -35,8 +44,7 @@ class TorrentResponse(BaseModel):
     magnet_url: str
 
 class TorrentCreate(BaseModel):
-    name: str
-    magnet_url: Optional[str] = None
+    magnet_url: str
 
 class QueueItemResponse(BaseModel):
     id: int
@@ -105,40 +113,74 @@ async def ping():
     """Endpoint de vérification de l'état de l'API"""
     return {"status": "ok", "timestamp": datetime.now().isoformat()}
 
-@app.get("/api/torrents", response_model=List[TorrentResponse])
+@app.get("/api/torrents")
 async def get_torrents():
-    """Récupère la liste de tous les torrents"""
-    # Pour le moment, utilise des données factices
-    # TODO: Remplacer par les vraies données de la base
-    torrents = generate_fake_torrents(50)
-    return torrents
+    """Récupère la liste de tous les torrents depuis Real-Debrid"""
+    try:
+        rd_torrents = await rd_client.get_torrents()
+        
+        # Mapper les données Real-Debrid vers notre format
+        mapped_torrents = [map_rd_torrent_to_response(rd_torrent) for rd_torrent in rd_torrents]
+        
+        logger.info(f"Récupéré {len(mapped_torrents)} torrents depuis Real-Debrid")
+        return mapped_torrents
+        
+    except Exception as e:
+        logger.error(f"Erreur lors de la récupération des torrents: {e}")
+        # En cas d'erreur, retourner une liste vide plutôt que de planter
+        return []
 
-@app.post("/api/torrents", response_model=TorrentResponse)
+@app.post("/api/torrents")
 async def add_torrent(torrent_data: TorrentCreate):
-    """Ajoute un nouveau torrent"""
-    # TODO: Implémenter la logique d'ajout réel
-    new_torrent = TorrentResponse(
-        id=str(random.randint(1000, 9999)),
-        name=torrent_data.name,
-        title=torrent_data.name,
-        size="0 GB",
-        status="queued",
-        state="paused",
-        progress=0,
-        speed="0 B/s",
-        category="Other",
-        seeders=0,
-        added_date=datetime.now().strftime("%d/%m/%Y %H:%M"),
-        hash=f"{''.join(random.choices('abcdef0123456789', k=40))}",
-        magnet_url=torrent_data.magnet_url or ""
-    )
-    return new_torrent
+    """Ajoute un nouveau torrent via Real-Debrid"""
+    try:
+        # Ajouter le torrent via Real-Debrid
+        rd_response = await rd_client.add_torrent(torrent_data.magnet_url)
+        
+        # Récupérer les informations du torrent ajouté
+        torrent_id = rd_response.get("id")
+        if torrent_id:
+            rd_torrent = await rd_client.get_torrent_info(torrent_id)
+            mapped_torrent = map_rd_torrent_to_response(rd_torrent)
+            logger.info(f"Torrent ajouté avec succès: {torrent_id}")
+            return mapped_torrent
+        else:
+            raise HTTPException(status_code=500, detail="Erreur lors de l'ajout du torrent")
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Erreur lors de l'ajout du torrent: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur lors de l'ajout: {str(e)}")
 
 @app.delete("/api/torrents/{torrent_id}")
 async def delete_torrent(torrent_id: str):
-    """Supprime un torrent"""
-    # TODO: Implémenter la logique de suppression
-    return {"success": True, "message": f"Torrent {torrent_id} supprimé"}
+    """Supprime un torrent via Real-Debrid"""
+    try:
+        success = await rd_client.delete_torrent(torrent_id)
+        if success:
+            logger.info(f"Torrent supprimé avec succès: {torrent_id}")
+            return {"success": True, "message": f"Torrent {torrent_id} supprimé"}
+        else:
+            raise HTTPException(status_code=500, detail="Erreur lors de la suppression")
+            
+    except Exception as e:
+        logger.error(f"Erreur lors de la suppression du torrent {torrent_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur lors de la suppression: {str(e)}")
+
+@app.get("/api/torrents/{torrent_id}")
+async def get_torrent_detail(torrent_id: str):
+    """Récupère les détails d'un torrent depuis Real-Debrid"""
+    try:
+        rd_torrent = await rd_client.get_torrent_info(torrent_id)
+        mapped_torrent = map_rd_torrent_detail_to_response(rd_torrent)
+        
+        logger.info(f"Détails récupérés pour le torrent: {torrent_id}")
+        return mapped_torrent
+        
+    except Exception as e:
+        logger.error(f"Erreur lors de la récupération des détails du torrent {torrent_id}: {e}")
+        raise HTTPException(status_code=404, detail=f"Torrent {torrent_id} non trouvé")
 
 @app.post("/api/torrents/{torrent_id}/reinsert")
 async def reinsert_torrent(torrent_id: str):
