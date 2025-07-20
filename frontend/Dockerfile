@@ -1,5 +1,6 @@
 # Dockerfile pour le développement du frontend SvelteKit
-FROM node:18-alpine
+ARG NODE_VERSION=20
+FROM node:${NODE_VERSION}-alpine
 
 WORKDIR /app
 

@@ -1,57 +1,118 @@
 <script lang="ts">
-	import { Avatar, Progress } from '@skeletonlabs/skeleton-svelte';
+	import type { PageData } from './$types';
+	import { Progress } from '@skeletonlabs/skeleton-svelte';
+	import { onMount, onDestroy } from 'svelte';
+	import { invalidate } from '$app/navigation';
+
+	export let data: PageData;
+
+	let intervalId: NodeJS.Timeout;
+
+	// Fonction utilitaire pour convertir les octets en Go
+	function bytesToGB(bytes: number): string {
+		return (bytes / (1024 ** 3)).toFixed(2);
+	}
+
+	// Fonction utilitaire pour calculer le pourcentage
+	function calculatePercentage(used: number, total: number): number {
+		return Math.round((used / total) * 100);
+	}
+
+	// Démarrer le polling au montage du composant
+	onMount(() => {
+		// Rafraîchir les données toutes les 5 secondes
+		intervalId = setInterval(() => {
+			invalidate('app:system');
+		}, 5000);
+	});
+
+	// Nettoyer l'intervalle au démontage du composant
+	onDestroy(() => {
+		if (intervalId) {
+			clearInterval(intervalId);
+		}
+	});
 </script>
 
 <div class="p-8 space-y-6">
-	<h1 class="text-3xl font-bold">Test Skeleton UI v3</h1>
-	
-	<div class="card p-6 space-y-4">
-		<h2 class="text-xl font-semibold">Composants et Utilitaires Skeleton UI v3</h2>
-		
-		<!-- Boutons avec les utilitaires CSS Skeleton -->
-		<div class="flex gap-4">
-			<button class="btn preset-filled-primary">Bouton Primaire</button>
-			<button class="btn preset-outlined-secondary">Bouton Secondaire</button>
-			<button class="btn preset-tonal-tertiary">Bouton Tertiaire</button>
-		</div>
-		
-		<!-- Avatar Component -->
-		<div class="flex items-center gap-4">
-			<Avatar initials="SK" width="w-12" background="bg-primary-500" />
-			<Avatar initials="UI" width="w-16" background="bg-secondary-500" />
-		</div>
-		
-		<!-- Progress Component -->
-		<div class="space-y-2">
-			<p class="text-sm font-medium">Chargement</p>
-			<Progress value={75} max={100} />
-		</div>
-		
-		<!-- Alert avec utilitaires CSS -->
-		<div class="alert preset-filled-warning">
+	<h1 class="h1">Dashboard</h1>
+
+	{#if data.error}
+		<!-- Cas d'erreur -->
+		<div class="alert preset-filled-error">
 			<div class="alert-message">
-				<h3>Test d'alerte</h3>
-				<p>Ceci est un test de Skeleton UI v3 avec Tailwind v4</p>
+				<h3>Erreur de chargement</h3>
+				<p>{data.error}</p>
 			</div>
 		</div>
-		
-		<!-- Badges avec utilitaires CSS -->
-		<div class="flex gap-2">
-			<span class="badge preset-filled-success">Succès</span>
-			<span class="badge preset-outlined-error">Erreur</span>
-			<span class="badge preset-tonal-warning">Avertissement</span>
-		</div>
-		
-		<!-- Cards avec utilitaires CSS -->
-		<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-			<div class="card p-4">
-				<h3 class="text-lg font-semibold mb-2">Carte 1</h3>
-				<p class="text-sm">Utilise les utilitaires CSS de Skeleton UI v3</p>
+	{:else if data.systemInfo}
+		<!-- Cas de succès - Affichage du dashboard -->
+		<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+			<!-- Widget CPU -->
+			<div class="card">
+				<header class="card-header">
+					<h3 class="h3">CPU</h3>
+				</header>
+				<section class="p-4 space-y-4">
+					<div class="text-2xl font-bold text-primary-500">
+						{data.systemInfo.cpu_percent}%
+					</div>
+					<Progress 
+						value={data.systemInfo.cpu_percent} 
+						max={100}
+					/>
+				</section>
 			</div>
-			<div class="card preset-tonal p-4">
-				<h3 class="text-lg font-semibold mb-2">Carte 2</h3>
-				<p class="text-sm">Avec le preset tonal</p>
+
+			<!-- Widget RAM -->
+			<div class="card">
+				<header class="card-header">
+					<h3 class="h3">RAM</h3>
+				</header>
+				<section class="p-4 space-y-4">
+					<div class="space-y-1">
+						<div class="text-2xl font-bold text-secondary-500">
+							{calculatePercentage(data.systemInfo.memory.used, data.systemInfo.memory.total)}%
+						</div>
+						<div class="text-sm text-surface-500">
+							{bytesToGB(data.systemInfo.memory.used)} Go / {bytesToGB(data.systemInfo.memory.total)} Go
+						</div>
+					</div>
+					<Progress 
+						value={calculatePercentage(data.systemInfo.memory.used, data.systemInfo.memory.total)} 
+						max={100}
+					/>
+				</section>
+			</div>
+
+			<!-- Widget Disque -->
+			<div class="card">
+				<header class="card-header">
+					<h3 class="h3">Disque</h3>
+				</header>
+				<section class="p-4 space-y-4">
+					<div class="space-y-1">
+						<div class="text-2xl font-bold text-tertiary-500">
+							{calculatePercentage(data.systemInfo.disk.used, data.systemInfo.disk.total)}%
+						</div>
+						<div class="text-sm text-surface-500">
+							{bytesToGB(data.systemInfo.disk.used)} Go / {bytesToGB(data.systemInfo.disk.total)} Go
+						</div>
+					</div>
+					<Progress 
+						value={calculatePercentage(data.systemInfo.disk.used, data.systemInfo.disk.total)} 
+						max={100}
+					/>
+				</section>
 			</div>
 		</div>
-	</div>
+	{:else}
+		<!-- Cas de chargement/vide -->
+		<div class="flex items-center justify-center p-12">
+			<div class="text-center space-y-4">
+				<div class="text-lg">Chargement des données système...</div>
+				<Progress value={undefined} />
+			</div>
+		</div>
+	{/if}
 </div>
