@@ -1,0 +1,51 @@
+# Dockerfile de production pour le Frontend
+# Construction multi-étapes pour optimiser la taille de l'image finale
+
+# ===== ÉTAPE 1: Construction =====
+FROM node:20-alpine AS builder
+
+# Variables d'environnement pour la construction
+ENV NODE_ENV=production
+ENV VITE_API_URL=/api
+
+# Répertoire de travail
+WORKDIR /app
+
+# Copier les fichiers de dépendances
+COPY package*.json ./
+
+# Installer les dépendances (production + dev pour la construction)
+RUN npm ci --include=dev
+
+# Copier le code source
+COPY . .
+
+# Construire l'application
+RUN npm run build
+
+# ===== ÉTAPE 2: Image de production =====
+FROM nginx:alpine AS production
+
+# Installer gettext pour envsubst (substitution de variables)
+RUN apk add --no-cache gettext
+
+# Copier les fichiers construits depuis l'étape builder
+COPY --from=builder /app/build /usr/share/nginx/html
+
+# Copier la configuration Nginx personnalisée
+COPY nginx.conf.template /etc/nginx/templates/default.conf.template
+
+# Variables d'environnement par défaut
+ENV API_BACKEND_URL=http://backend:8000
+ENV NGINX_PORT=3000
+
+# Exposer le port
+EXPOSE 3000
+
+# Démarrage avec substitution des variables d'environnement
+CMD ["nginx", "-g", "daemon off;"]
+
+# Métadonnées
+LABEL maintainer="redriva@example.com"
+LABEL version="1.0.0"
+LABEL description="Redriva Frontend - Production Image"

@@ -1,0 +1,28 @@
+# Fichiers de configuration sensibles
+config/.env*
+.env
+.env.*
+!.env.example
+frontend/.env.production
+backend/.env.production
+
+# Dossiers de données et de logs
+/data/
+/logs/
+
+# Dépendances Node.js
+node_modules/
+/frontend/node_modules/
+/frontend/.svelte-kit/
+/frontend/build/
+/frontend/dist/
+
+# Dépendances et cache Python
+/backend/venv/
+/backend/__pycache__/
+.pytest_cache
+
+# Fichiers de l'éditeur et du système d'exploitation
+.vscode/
+.DS_Store
+*.swp

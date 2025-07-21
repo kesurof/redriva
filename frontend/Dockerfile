@@ -1,18 +1,23 @@
-FROM node:20-alpine AS build
-WORKDIR /app
-COPY package.json ./
-COPY src ./src
-COPY svelte.config.js ./
-COPY vite.config.js ./
-COPY tailwind.config.cjs ./
-COPY .npmrc ./
-ENV PATH="./node_modules/.bin:$PATH"
-RUN npm install
-RUN npm run build
+# Dockerfile pour le développement du frontend SvelteKit
+ARG NODE_VERSION=20
+FROM node:${NODE_VERSION}-alpine
 
-FROM node:20-alpine
 WORKDIR /app
-COPY --from=build /app .
-ENV NODE_ENV=production
-EXPOSE 4173
-CMD ["npm", "run", "preview", "--", "--port", "4173", "--host"]
+
+# Copier les fichiers de dépendances
+COPY package*.json ./
+
+# Installer les dépendances
+RUN npm install
+
+# Copier le code source
+COPY . .
+
+# Exposer le port
+EXPOSE 5173
+
+# Variables d'environnement
+ENV NODE_ENV=development
+
+# Commande pour démarrer en mode développement
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "5173"]

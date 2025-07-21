@@ -3,4 +3,11 @@ uvicorn[standard]
 aiohttp
 aiosqlite
 pydantic
-python-dotenv
+pytest
+httpx
+psutil
+redis
+arq
+celery[redis]
+prometheus-client
+structlog

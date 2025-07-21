@@ -1,18 +1,21 @@
-
 services:
   backend:
     container_name: redriva-backend
     build:
-      context: .
-      dockerfile: backend/Dockerfile
-    environment:
-      - RD_TOKEN=VOTRE_TOKEN_RD_ICI
+      context: ./backend
+      dockerfile: Dockerfile 
     volumes:
-      - ./data:/app/data
-      - ./logs:/app/logs
+      - ./backend:/app 
+      - redriva-data:/app/data
+      - redriva-logs:/app/logs
     ports:
-      - "8000:8000"
+      - "8080:8000"
+    networks:
+      - redriva-net
     restart: unless-stopped
+    env_file:
+      - .env
+    command: uvicorn app:app --host 0.0.0.0 --port 8000 --reload
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/ping"]
       interval: 30s
@@ -23,19 +26,30 @@ services:
 
   frontend:
     container_name: redriva-frontend
-    build: ./frontend
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
     ports:
-      - "4173:4173"
+      - "5173:5173"
+    networks:
+      - redriva-net
     depends_on:
-      backend:
-        condition: service_healthy
-    environment:
-      - VITE_API_URL=http://backend:8000
+      - backend
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:4173"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
+    environment:
+      - NODE_ENV=development
+      - VITE_API_URL=http://localhost:8080
+    command: npm run dev -- --host 0.0.0.0 --port 5173
     labels:
       - "com.redriva.service=frontend"
+
+networks:
+  redriva-net:
+    driver: bridge
+
+volumes:
+  redriva-data:
+  redriva-logs:
