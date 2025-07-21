@@ -1,4 +1,4 @@
-import adapter from '@sveltejs/adapter-static';
+import adapter from '@sveltejs/adapter-node';
 // Le chemin correct pour importer vitePreprocess dans notre configuration
 import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
 
@@ -10,12 +10,8 @@ const config = {
 
 	kit: {
 		adapter: adapter({
-			// Configuration pour serveur statique (Nginx)
-			pages: 'build',
-			assets: 'build',
-			fallback: 'index.html', // SPA fallback pour les routes dynamiques
-			precompress: false,
-			strict: true
+			// Configuration pour serveur Node.js
+			out: 'build'
 		})
 	}
 };
