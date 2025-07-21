@@ -9,3 +9,5 @@ psutil
 redis
 arq
 celery[redis]
+prometheus-client
+structlog

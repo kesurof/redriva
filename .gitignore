@@ -1,5 +1,10 @@
 # Fichiers de configuration sensibles
 config/.env*
+.env
+.env.*
+!.env.example
+frontend/.env.production
+backend/.env.production
 
 # Dossiers de données et de logs
 /data/

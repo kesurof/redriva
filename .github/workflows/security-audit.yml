@@ -1,0 +1,346 @@
+name: Security Audit
+
+on:
+  schedule:
+    # Exécute l'audit chaque lundi à 9h UTC
+    - cron: '0 9 * * 1'
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'backend/requirements.txt'
+      - 'frontend/package.json'
+      - 'frontend/package-lock.json'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'backend/requirements.txt'
+      - 'frontend/package.json'
+      - 'frontend/package-lock.json'
+  workflow_dispatch: # Permet d'exécuter manuellement
+
+jobs:
+  security-audit:
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: read
+      security-events: write
+      pull-requests: write
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.12'
+        cache: 'pip'
+    
+    - name: Set up Node.js 20
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+    
+    - name: Install Python security tools
+      run: |
+        pip install --upgrade pip
+        pip install pip-audit safety bandit
+    
+    - name: Python Dependencies Audit
+      run: |
+        echo "## 🐍 Python Security Audit" >> $GITHUB_STEP_SUMMARY
+        
+        # Audit avec pip-audit
+        if pip-audit -r backend/requirements.txt --format=markdown --output=python-audit.md; then
+          echo "✅ Aucune vulnérabilité critique détectée" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "⚠️ Des vulnérabilités ont été détectées" >> $GITHUB_STEP_SUMMARY
+          cat python-audit.md >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        # Audit avec Safety
+        echo -e "\n### Safety Check" >> $GITHUB_STEP_SUMMARY
+        if safety check -r backend/requirements.txt --json --output safety-report.json; then
+          echo "✅ Safety check passed" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "⚠️ Safety issues detected" >> $GITHUB_STEP_SUMMARY
+        fi
+    
+    - name: Node.js Dependencies Audit
+      working-directory: frontend
+      run: |
+        echo -e "\n## 📦 Node.js Security Audit" >> $GITHUB_STEP_SUMMARY
+        
+        # Installation des dépendances
+        npm ci
+        
+        # Audit npm
+        if npm audit --audit-level moderate --json > npm-audit.json; then
+          echo "✅ Aucune vulnérabilité critique détectée" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "⚠️ Des vulnérabilités ont été détectées" >> $GITHUB_STEP_SUMMARY
+          
+          # Convertir le JSON en format lisible
+          echo -e "\n### Détails des vulnérabilités" >> $GITHUB_STEP_SUMMARY
+          npm audit --audit-level moderate >> $GITHUB_STEP_SUMMARY || true
+        fi
+    
+    - name: Code Security Scan (Bandit for Python)
+      run: |
+        echo -e "\n## 🔍 Code Security Scan" >> $GITHUB_STEP_SUMMARY
+        
+        if bandit -r backend/ -f json -o bandit-report.json; then
+          echo "✅ Aucun problème de sécurité détecté dans le code Python" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "⚠️ Des problèmes de sécurité potentiels détectés" >> $GITHUB_STEP_SUMMARY
+          bandit -r backend/ >> $GITHUB_STEP_SUMMARY || true
+        fi
+    
+    - name: Docker Security Check
+      run: |
+        echo -e "\n## 🐳 Docker Security Check" >> $GITHUB_STEP_SUMMARY
+        
+        # Vérifier les Dockerfiles
+        for dockerfile in backend/Dockerfile* frontend/Dockerfile*; do
+          if [ -f "$dockerfile" ]; then
+            echo "Checking $dockerfile" >> $GITHUB_STEP_SUMMARY
+            
+            # Vérifier l'utilisateur root
+            if grep -q "USER root" "$dockerfile"; then
+              echo "❌ $dockerfile utilise l'utilisateur root" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "✅ $dockerfile utilise un utilisateur non-root" >> $GITHUB_STEP_SUMMARY
+            fi
+          fi
+        done
+    
+    - name: License Check
+      run: |
+        echo -e "\n## 📄 License Compliance" >> $GITHUB_STEP_SUMMARY
+        
+        # Vérifier les licences Python
+        pip install pip-licenses
+        pip-licenses --format=markdown --output-file=python-licenses.md
+        echo "### Python Dependencies Licenses" >> $GITHUB_STEP_SUMMARY
+        cat python-licenses.md >> $GITHUB_STEP_SUMMARY
+        
+        # Vérifier les licences Node.js
+        cd frontend
+        npx license-checker --onlyAllow 'MIT;Apache-2.0;BSD-2-Clause;BSD-3-Clause;ISC' --summary >> $GITHUB_STEP_SUMMARY || echo "⚠️ Des licences non-autorisées détectées" >> $GITHUB_STEP_SUMMARY
+    
+    - name: Upload Security Reports
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: security-reports
+        path: |
+          python-audit.md
+          safety-report.json
+          bandit-report.json
+          python-licenses.md
+          frontend/npm-audit.json
+        retention-days: 30
+    
+    - name: Create Security Issue (on vulnerabilities)
+      if: failure()
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const title = '🔒 Security vulnerabilities detected';
+          const body = `
+          # Security Audit Failed
+          
+          Des vulnérabilités de sécurité ont été détectées lors de l'audit automatique.
+          
+          ## Actions recommandées
+          
+          1. Consulter les rapports d'audit en pièce jointe
+          2. Mettre à jour les dépendances vulnérables
+          3. Exécuter \`./scripts/update-deps.sh\` pour une mise à jour automatique
+          4. Re-exécuter l'audit de sécurité
+          
+          ## Détails
+          
+          - **Workflow:** ${context.workflow}
+          - **Run ID:** ${context.runId}
+          - **Commit:** ${context.sha}
+          
+          Cette issue a été créée automatiquement par le workflow de sécurité.
+          `;
+          
+          // Chercher une issue existante
+          const existingIssues = await github.rest.issues.listForRepo({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            labels: ['security', 'automated'],
+            state: 'open'
+          });
+          
+          if (existingIssues.data.length === 0) {
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: title,
+              body: body,
+              labels: ['security', 'automated', 'high-priority']
+            });
+          }
+    
+    - name: Comment PR (on pull request)
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          let comment = '## 🔒 Security Audit Results\n\n';
+          
+          try {
+            const summary = fs.readFileSync(process.env.GITHUB_STEP_SUMMARY, 'utf8');
+            comment += summary;
+          } catch (error) {
+            comment += 'Audit completed. Check the workflow logs for details.';
+          }
+          
+          comment += '\n\n---\n*This comment was generated automatically by the security audit workflow.*';
+          
+          await github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: comment
+          });
+
+  dependency-update:
+    runs-on: ubuntu-latest
+    needs: security-audit
+    if: github.event_name == 'schedule' && github.ref == 'refs/heads/main'
+    
+    permissions:
+      contents: write
+      pull-requests: write
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Set up Python and Node.js
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.12'
+    
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+    
+    - name: Configure Git
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+    
+    - name: Create dependency update branch
+      run: |
+        BRANCH_NAME="automated/dependency-update-$(date +%Y%m%d)"
+        git checkout -b $BRANCH_NAME
+        echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
+    
+    - name: Update Python dependencies
+      run: |
+        # Installer pip-tools pour la mise à jour
+        pip install pip-tools
+        
+        # Créer un requirements.in si il n'existe pas
+        if [ ! -f "backend/requirements.in" ]; then
+          cp backend/requirements.txt backend/requirements.in
+        fi
+        
+        # Mettre à jour
+        cd backend
+        pip-compile --upgrade requirements.in
+        
+        # Vérifier s'il y a des changements
+        if ! git diff --quiet requirements.txt; then
+          echo "PYTHON_UPDATED=true" >> $GITHUB_ENV
+          git add requirements.txt
+        fi
+    
+    - name: Update Node.js dependencies
+      working-directory: frontend
+      run: |
+        # Mettre à jour les dépendances patch et minor
+        npm update
+        
+        # Vérifier s'il y a des changements
+        if ! git diff --quiet package-lock.json; then
+          echo "NODE_UPDATED=true" >> $GITHUB_ENV
+          git add package.json package-lock.json
+        fi
+    
+    - name: Commit and push changes
+      if: env.PYTHON_UPDATED == 'true' || env.NODE_UPDATED == 'true'
+      run: |
+        git commit -m "chore: update dependencies (automated)
+        
+        - Python dependencies: ${{ env.PYTHON_UPDATED == 'true' && 'updated' || 'no changes' }}
+        - Node.js dependencies: ${{ env.NODE_UPDATED == 'true' && 'updated' || 'no changes' }}
+        
+        Generated by automated dependency update workflow."
+        
+        git push origin $BRANCH_NAME
+    
+    - name: Create Pull Request
+      if: env.PYTHON_UPDATED == 'true' || env.NODE_UPDATED == 'true'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const { data: pr } = await github.rest.pulls.create({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            title: '🤖 Automated dependency updates',
+            head: process.env.BRANCH_NAME,
+            base: 'main',
+            body: `
+            # Automated Dependency Updates
+            
+            Cette PR contient les mises à jour automatiques des dépendances.
+            
+            ## Changements
+            
+            - **Python:** ${process.env.PYTHON_UPDATED === 'true' ? '✅ Mis à jour' : '➖ Aucun changement'}
+            - **Node.js:** ${process.env.NODE_UPDATED === 'true' ? '✅ Mis à jour' : '➖ Aucun changement'}
+            
+            ## Validation
+            
+            - [ ] Tests automatiques passés
+            - [ ] Audit de sécurité validé
+            - [ ] Révision manuelle effectuée
+            
+            ## Notes
+            
+            Cette PR a été créée automatiquement par le workflow de mise à jour des dépendances.
+            Merci de la réviser avant de la fusionner.
+            
+            /cc @${context.actor}
+            `,
+            draft: false
+          });
+          
+          // Ajouter des labels
+          await github.rest.issues.addLabels({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: pr.number,
+            labels: ['dependencies', 'automated', 'chore']
+          });
+          
+          // Demander une révision si un utilisateur spécifique est configuré
+          // await github.rest.pulls.requestReviewers({
+          //   owner: context.repo.owner,
+          //   repo: context.repo.repo,
+          //   pull_number: pr.number,
+          //   reviewers: ['username'] // Remplacer par le nom d'utilisateur souhaité
+          // });

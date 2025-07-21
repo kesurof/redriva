@@ -17,6 +17,7 @@ import logging
 from services.realdebrid import rd_client
 from services.data_mapper import map_rd_torrent_to_response, map_rd_torrent_detail_to_response
 from services.queue_service import queue_service
+from services.monitoring import metrics, get_metrics
 from database.auth_db import auth_db
 
 # Configuration du logging
@@ -198,6 +199,11 @@ def generate_fake_torrents(count: int = 10) -> List[TorrentResponse]:
 async def ping():
     """Endpoint de vérification de l'état de l'API"""
     return {"status": "ok", "timestamp": datetime.now().isoformat()}
+
+@app.get("/metrics")
+async def metrics_endpoint():
+    """Endpoint Prometheus pour les métriques de monitoring"""
+    return await get_metrics()
 
 # === ROUTES D'AUTHENTIFICATION ===
 

@@ -3,6 +3,125 @@
 
 Redriva est une application web complète pour gérer, visualiser et automatiser vos torrents et téléchargements Real-Debrid, avec une interface moderne, sécurisée et évolutive.
 
+## 🚀 Fonctionnalités principales
+
+### Interface Utilisateur
+- 📊 **Tableau de bord** : Statistiques en temps réel, filtres avancés, alertes automatiques
+- 📋 **File d'attente intelligente** : Gestion des priorités avec actions groupées et polling automatique
+- 🎯 **Gestion des torrents** : Ajout/suppression, visualisation détaillée, scraper intégré
+- 🌍 **Expérience utilisateur** : Interface responsive, dark mode, internationalisation (i18n)
+
+### Sécurité et Production
+- 🔒 **Sécurité avancée** : Tokens sécurisés, rate limiting, logs d'audit complets
+- 📈 **Monitoring** : Métriques Prometheus, surveillance des performances
+- 🔧 **Maintenance** : Scripts d'automatisation, mises à jour sécurisées
+- 🛡️ **Audits** : Vérification automatique des vulnérabilités
+
+### DevOps et Qualité
+- ✅ **Tests complets** : Tests unitaires, intégration, E2E avec Playwright
+- 🔄 **CI/CD** : Workflows GitHub Actions, déploiement automatisé
+- 📚 **Documentation** : Guides complets, API documentée, FAQ
+- 🐳 **Containerisation** : Images Docker optimisées, orchestration
+
+## 📁 Structure du projet
+
+```
+redriva/
+├── frontend/               # Application SvelteKit (UI moderne)
+│   ├── src/
+│   │   ├── lib/           # Composants réutilisables
+│   │   ├── routes/        # Pages et API routes
+│   │   └── app.html       # Template principal
+│   ├── Dockerfile         # Image de production
+│   └── nginx.conf.template # Configuration Nginx sécurisée
+├── backend/               # API FastAPI (serveur robuste)
+│   ├── app.py             # Application principale
+│   ├── services/          # Services métier
+│   │   ├── monitoring.py  # Métriques Prometheus
+│   │   └── realdebrid.py  # Intégration Real-Debrid
+│   ├── database/          # Gestion des données
+│   └── Dockerfile         # Image de production
+├── scripts/               # Scripts d'automatisation
+│   ├── deploy-unified.sh  # Déploiement orchestré
+│   ├── security-audit.sh  # Audit de sécurité
+│   ├── update-deps.sh     # Mise à jour des dépendances
+│   ├── performance-test.sh # Tests de performance
+│   ├── validate.sh        # Validation complète
+│   └── README.md          # Documentation des scripts
+├── .github/workflows/     # CI/CD GitHub Actions
+│   └── security-audit.yml # Workflow de sécurité
+├── docs/                  # Documentation technique
+└── docker-compose.yml     # Orchestration complète
+```
+
+## ⚡ Démarrage rapide
+
+### Validation et déploiement automatique
+```bash
+# 1. Validation complète du projet
+./scripts/validate.sh
+
+# 2. Déploiement unifié (recommandé)
+./scripts/deploy-unified.sh deploy
+
+# 3. Accès à l'application
+# Frontend: http://localhost:3000
+# API: http://localhost:8000
+# Métriques: http://localhost:8000/metrics
+```
+
+### Déploiement manuel
+```bash
+# Construction et démarrage
+docker compose up -d --build
+
+# Vérification des services
+docker compose ps
+curl http://localhost:8000/health
+```
+
+## 🔧 Scripts d'Automatisation
+
+Redriva inclut une suite complète de scripts pour automatiser la maintenance, la sécurité et le déploiement :
+
+### Scripts Principaux
+| Script | Description | Usage |
+|--------|-------------|-------|
+| `validate.sh` | Validation complète du projet | `./scripts/validate.sh` |
+| `deploy-unified.sh` | Déploiement orchestré | `./scripts/deploy-unified.sh deploy` |
+| `security-audit.sh` | Audit de sécurité automatisé | `./scripts/security-audit.sh` |
+| `update-deps.sh` | Mise à jour des dépendances | `./scripts/update-deps.sh` |
+| `performance-test.sh` | Tests de performance | `./scripts/performance-test.sh` |
+
+### Workflows Automatisés
+
+**Développement :**
+```bash
+# Audit + Déploiement dev + Tests
+./scripts/security-audit.sh
+./scripts/deploy-unified.sh deploy --environment development
+./scripts/performance-test.sh --load-only
+```
+
+**Production :**
+```bash
+# Validation complète + Déploiement sécurisé
+./scripts/validate.sh
+./scripts/deploy-unified.sh deploy --performance-tests
+```
+
+**Maintenance mensuelle :**
+```bash
+# Mise à jour + Audit + Tests
+./scripts/update-deps.sh
+./scripts/security-audit.sh
+./scripts/performance-test.sh
+```
+
+📖 **Documentation complète :** [`scripts/README.md`](scripts/README.md)naire Real-Debrid moderne
+
+Redriva est une application web complète pour gérer, visualiser et automatiser vos torrents et téléchargements Real-Debrid, avec une interface moderne, sécurisée et évolutive.
+
 ## Fonctionnalités principales
 - Tableau de bord (stats, filtres, alertes, logs, quotas)
 - File d’attente et gestion des priorités (ajout, suppression, actions, polling)
