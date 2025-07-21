@@ -1,5 +1,24 @@
+const { skeleton } = require('@skeletonlabs/skeleton/plugin');
+const forms = require('@tailwindcss/forms');
+const path = require('path');
+
 /** @type {import('tailwindcss').Config} */
-export default {
-	// Pas de configuration nécessaire pour Tailwind v4 avec Skeleton UI v3
-	// Toute la configuration se fait dans app.css
-}
+module.exports = {
+	darkMode: 'class',
+	content: [
+		'./src/**/*.{html,js,svelte,ts}',
+		// Chemin standard pour inclure les fichiers du plugin Skeleton en v2/v3
+		path.join(require.resolve('@skeletonlabs/skeleton'), '../**/*.{html,js,svelte,ts}')
+	],
+	theme: {
+		extend: {},
+	},
+	plugins: [
+		forms,
+		skeleton({
+			themes: {
+				preset: [ "skeleton", "wintry", "modern" ]
+			}
+		})
+	],
+};

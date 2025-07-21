@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { PageData } from './$types';
-	import { Progress } from '@skeletonlabs/skeleton-svelte';
+	import { Progress } from '@skeletonlabs/skeleton';
 	import TorrentAddModal from '$lib/components/TorrentAddModal.svelte';
 
 	export let data: PageData;

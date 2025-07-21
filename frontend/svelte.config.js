@@ -1,12 +1,16 @@
-import adapter from '@sveltejs/adapter-node';
+import adapter from '@sveltejs/adapter-auto';
+// Le chemin correct pour importer vitePreprocess dans notre configuration
 import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
 
 /** @type {import('@sveltejs/kit').Config} */
 const config = {
-	// Consult https://svelte.dev/docs/kit/integrations
-	// for more information about preprocessors
+	// Consultation de la documentation pour plus d'informations sur les préprocesseurs
+	// https://kit.svelte.dev/docs/integrations#preprocessors
 	preprocess: vitePreprocess(),
-	kit: { adapter: adapter() }
+
+	kit: {
+		adapter: adapter()
+	}
 };
 
 export default config;

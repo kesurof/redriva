@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { PageData } from './$types';
-	import { Progress } from '@skeletonlabs/skeleton-svelte';
+	import { Progress } from '@skeletonlabs/skeleton';
 	import { onMount, onDestroy } from 'svelte';
 	import { invalidate } from '$app/navigation';
 

@@ -11,6 +11,7 @@ import logging
 # Import de nos services
 from services.realdebrid import rd_client
 from services.data_mapper import map_rd_torrent_to_response, map_rd_torrent_detail_to_response
+from database.auth_db import auth_db
 
 # Configuration du logging
 logging.basicConfig(level=logging.INFO)
@@ -26,6 +27,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Initialisation de la base de données au démarrage
+@app.on_event("startup")
+async def startup_event():
+    await auth_db.init_db()
 
 # Modèles Pydantic pour l'API
 class TorrentResponse(BaseModel):
@@ -66,6 +72,17 @@ class ApiResponse(BaseModel):
     success: bool
     message: Optional[str] = None
     data: Optional[Any] = None
+
+class DeviceCodeResponse(BaseModel):
+    device_code: str
+    user_code: str
+    verification_url: str
+    expires_in: int
+    interval: int
+
+class AuthStatusResponse(BaseModel):
+    authenticated: bool
+    message: Optional[str] = None
 
 # Initialisation de la base de données
 @app.on_event("startup")
@@ -112,6 +129,88 @@ def generate_fake_torrents(count: int = 10) -> List[TorrentResponse]:
 async def ping():
     """Endpoint de vérification de l'état de l'API"""
     return {"status": "ok", "timestamp": datetime.now().isoformat()}
+
+# === ROUTES D'AUTHENTIFICATION ===
+
+@app.get("/api/auth/status", response_model=AuthStatusResponse)
+async def get_auth_status():
+    """Vérifie si l'utilisateur est authentifié"""
+    is_authenticated = await auth_db.is_authenticated()
+    return AuthStatusResponse(
+        authenticated=is_authenticated,
+        message="Authentifié" if is_authenticated else "Non authentifié"
+    )
+
+@app.post("/api/auth/device-code", response_model=DeviceCodeResponse)
+async def get_device_code():
+    """Initie le flux d'authentification OAuth Device Flow"""
+    try:
+        device_data = await rd_client.get_device_code()
+        
+        # Stocker les informations du device code
+        await auth_db.store_device_code(
+            device_code=device_data["device_code"],
+            user_code=device_data["user_code"],
+            verification_url=device_data["verification_url"],
+            expires_in=device_data["expires_in"],
+            interval_time=device_data["interval"]
+        )
+        
+        logger.info(f"Device code généré: {device_data['user_code']}")
+        
+        return DeviceCodeResponse(
+            device_code=device_data["device_code"],
+            user_code=device_data["user_code"],
+            verification_url=device_data["verification_url"],
+            expires_in=device_data["expires_in"],
+            interval=device_data["interval"]
+        )
+        
+    except Exception as e:
+        logger.error(f"Erreur lors de la génération du device code: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur lors de l'authentification: {str(e)}")
+
+@app.post("/api/auth/check-token")
+async def check_device_authorization(request: dict):
+    """Vérifie l'état de l'autorisation et récupère le token si approuvé"""
+    try:
+        device_code = request.get('device_code')
+        if not device_code:
+            raise HTTPException(status_code=400, detail="device_code requis")
+            
+        result = await rd_client.check_device_authorization(device_code)
+        
+        if result["status"] == "success":
+            # Stocker le token d'accès
+            token_data = result["data"]
+            await auth_db.store_access_token(token_data["access_token"])
+            
+            logger.info("Authentification réussie, token stocké")
+            return {"status": "success", "message": "Authentification réussie"}
+            
+        elif result["status"] == "pending":
+            return {"status": "pending", "message": result["message"]}
+        else:
+            return {"status": "error", "message": "Erreur lors de la vérification"}
+            
+    except Exception as e:
+        logger.error(f"Erreur lors de la vérification du token: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur lors de la vérification: {str(e)}")
+
+@app.post("/api/auth/logout")
+async def logout():
+    """Déconnecte l'utilisateur en supprimant le token"""
+    try:
+        # Supprimer le token de la base de données
+        await auth_db.store_access_token("")  # Cela va écraser avec une chaîne vide
+        logger.info("Déconnexion réussie")
+        return {"status": "success", "message": "Déconnexion réussie"}
+        
+    except Exception as e:
+        logger.error(f"Erreur lors de la déconnexion: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur lors de la déconnexion: {str(e)}")
+
+# === ROUTES TORRENTS ===
 
 @app.get("/api/torrents")
 async def get_torrents():
