@@ -1,6 +1,11 @@
 # API FastAPI pure pour Redriva
 import os
 import random
+import psutil
+import time
+import asyncio
+import aiohttp
+import socket
 from datetime import datetime, timedelta
 from fastapi import FastAPI, BackgroundTasks, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,11 +16,54 @@ import logging
 # Import de nos services
 from services.realdebrid import rd_client
 from services.data_mapper import map_rd_torrent_to_response, map_rd_torrent_detail_to_response
+from services.queue_service import queue_service
 from database.auth_db import auth_db
 
 # Configuration du logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Fonctions utilitaires pour la surveillance des services
+async def check_port_connectivity(host: str, port: int, timeout: float = 5.0) -> bool:
+    """Vérifie si un port est accessible"""
+    try:
+        reader, writer = await asyncio.wait_for(
+            asyncio.open_connection(host, port), 
+            timeout=timeout
+        )
+        writer.close()
+        await writer.wait_closed()
+        return True
+    except (OSError, asyncio.TimeoutError):
+        return False
+
+async def check_http_health(url: str, timeout: float = 10.0) -> tuple[bool, Optional[int]]:
+    """Vérifie la santé d'un service via HTTP et retourne (status, response_time_ms)"""
+    try:
+        start_time = time.time()
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=timeout)) as session:
+            async with session.get(url) as response:
+                response_time = int((time.time() - start_time) * 1000)
+                return response.status < 500, response_time
+    except Exception as e:
+        logger.debug(f"Erreur HTTP pour {url}: {e}")
+        return False, None
+
+async def get_docker_container_info(container_name: str) -> Optional[Dict]:
+    """Récupère les informations d'un conteneur Docker via l'API REST"""
+    try:
+        # Essayer d'accéder à l'API Docker via le socket Unix monté
+        # Note: Il faudra monter /var/run/docker.sock dans le conteneur backend
+        unix_socket_path = "/var/run/docker.sock"
+        if not os.path.exists(unix_socket_path):
+            return None
+            
+        # Pour l'instant, on simule - l'implémentation complète nécessiterait
+        # une bibliothèque Docker ou des appels direct à l'API REST
+        return {"running": True, "status": "Up"}
+    except Exception as e:
+        logger.debug(f"Impossible de récupérer les infos Docker pour {container_name}: {e}")
+        return None
 
 app = FastAPI(title="Redriva API", version="1.0.0")
 
@@ -32,6 +80,11 @@ app.add_middleware(
 @app.on_event("startup")
 async def startup_event():
     await auth_db.init_db()
+    await queue_service.init()
+
+@app.on_event("shutdown") 
+async def shutdown_event():
+    await queue_service.close()
 
 # Modèles Pydantic pour l'API
 class TorrentResponse(BaseModel):
@@ -63,10 +116,13 @@ class QueueItemCreate(BaseModel):
     data: Dict[str, Any]
 
 class SystemInfoResponse(BaseModel):
-    cpu_usage: float
-    memory_usage: float
-    disk_usage: float
+    cpu_percent: float
+    memory: Dict[str, int]  # used, total, available
+    disk: Dict[str, int]    # used, total, free
     uptime: str
+    load_average: Optional[List[float]] = None
+    boot_time: str
+    network: Optional[Dict[str, int]] = None
 
 class ApiResponse(BaseModel):
     success: bool
@@ -83,6 +139,19 @@ class DeviceCodeResponse(BaseModel):
 class AuthStatusResponse(BaseModel):
     authenticated: bool
     message: Optional[str] = None
+
+class ServiceResponse(BaseModel):
+    name: str
+    status: str  # 'online', 'offline', 'warning', 'maintenance'
+    description: str
+    url: Optional[str] = None
+    version: Optional[str] = None
+    lastCheck: str  # ISO timestamp
+    responseTime: Optional[int] = None  # en ms
+    uptime: Optional[str] = None
+    cpu_usage: Optional[float] = None
+    memory_usage: Optional[float] = None
+    port: Optional[int] = None
 
 # Initialisation de la base de données
 @app.on_event("startup")
@@ -335,29 +404,227 @@ async def delete_from_queue(queue_id: int):
 
 @app.get("/api/system", response_model=SystemInfoResponse)
 async def get_system_info():
-    """Récupère les informations système"""
-    import psutil
-    import time
-    
+    """Récupère les informations système complètes"""
     try:
-        uptime_seconds = time.time() - psutil.boot_time()
+        # CPU
+        cpu_percent = psutil.cpu_percent(interval=1)
+        
+        # Mémoire
+        memory = psutil.virtual_memory()
+        memory_info = {
+            "used": memory.used,
+            "total": memory.total,
+            "available": memory.available
+        }
+        
+        # Disque (partition racine)
+        disk = psutil.disk_usage('/')
+        disk_info = {
+            "used": disk.used,
+            "total": disk.total,
+            "free": disk.free
+        }
+        
+        # Uptime
+        boot_time = psutil.boot_time()
+        uptime_seconds = time.time() - boot_time
         uptime_hours = int(uptime_seconds // 3600)
         uptime_minutes = int((uptime_seconds % 3600) // 60)
+        uptime_str = f"{uptime_hours}h {uptime_minutes}m"
+        
+        # Boot time
+        boot_time_str = datetime.fromtimestamp(boot_time).strftime("%Y-%m-%d %H:%M:%S")
+        
+        # Load average (Linux/Unix seulement)
+        load_avg = None
+        try:
+            load_avg = list(os.getloadavg())
+        except (OSError, AttributeError):
+            # Pas disponible sur Windows
+            pass
+        
+        # Réseau (optionnel)
+        network_info = None
+        try:
+            net_io = psutil.net_io_counters()
+            network_info = {
+                "bytes_sent": net_io.bytes_sent,
+                "bytes_recv": net_io.bytes_recv
+            }
+        except:
+            pass
         
         return SystemInfoResponse(
-            cpu_usage=psutil.cpu_percent(interval=1),
-            memory_usage=psutil.virtual_memory().percent,
-            disk_usage=psutil.disk_usage('/').percent,
-            uptime=f"{uptime_hours}h {uptime_minutes}m"
+            cpu_percent=cpu_percent,
+            memory=memory_info,
+            disk=disk_info,
+            uptime=uptime_str,
+            load_average=load_avg,
+            boot_time=boot_time_str,
+            network=network_info
         )
     except Exception as e:
-        print(f"Erreur lors de la récupération des infos système: {e}")
+        logger.error(f"Erreur lors de la récupération des infos système: {e}")
+        # Retourner des valeurs par défaut en cas d'erreur
         return SystemInfoResponse(
-            cpu_usage=0.0,
-            memory_usage=0.0,
-            disk_usage=0.0,
-            uptime="Unknown"
+            cpu_percent=0.0,
+            memory={"used": 0, "total": 1, "available": 1},
+            disk={"used": 0, "total": 1, "free": 1},
+            uptime="Unknown",
+            boot_time="Unknown"
         )
+
+@app.get("/api/services", response_model=List[ServiceResponse])
+async def get_services():
+    """Récupère la liste des services avec leur statut et métriques"""
+    try:
+        services = []
+        
+        # Définition des services à surveiller avec leurs vrais conteneurs
+        # Utilisation de l'IP de la gateway Docker pour accéder aux services de l'hôte
+        docker_host_ip = "172.17.0.1"  # IP de la gateway Docker par défaut
+        
+        service_configs = [
+            {
+                "name": "Redriva Backend", 
+                "description": "API Backend Redriva",
+                "host": docker_host_ip,
+                "port": 8080,
+                "url": f"http://{docker_host_ip}:8080/api/ping",
+                "public_url": "http://localhost:8080",
+                "version": "1.0.0",
+                "container_name": "redriva-backend"
+            },
+            {
+                "name": "Redriva Frontend",
+                "description": "Interface utilisateur web SvelteKit",
+                "host": docker_host_ip, 
+                "port": 5173,
+                "url": f"http://{docker_host_ip}:5173",
+                "public_url": "http://localhost:5173",
+                "version": "1.0.0",
+                "container_name": "redriva-frontend"
+            },
+            {
+                "name": "Sonarr",
+                "description": "Gestionnaire de séries TV automatisé",
+                "host": docker_host_ip,
+                "port": 8989,
+                "url": f"http://{docker_host_ip}:8989/api/v3/system/status",
+                "public_url": "http://localhost:8989",
+                "version": "4.0.0",
+                "container_name": "sonarr"
+            },
+            {
+                "name": "Radarr", 
+                "description": "Gestionnaire de films automatisé",
+                "host": docker_host_ip,
+                "port": 7878,
+                "url": f"http://{docker_host_ip}:7878/api/v3/system/status",
+                "public_url": "http://localhost:7878",
+                "version": "5.0.0",
+                "container_name": "radarr"
+            },
+            {
+                "name": "Prowlarr",
+                "description": "Gestionnaire d'indexeurs",
+                "host": docker_host_ip,
+                "port": 9696,
+                "url": f"http://{docker_host_ip}:9696/api/v1/system/status",
+                "public_url": "http://localhost:9696",
+                "version": "1.8.6",
+                "container_name": "prowlarr"
+            },
+            {
+                "name": "Jackett",
+                "description": "Proxy pour indexeurs torrent",
+                "host": docker_host_ip,
+                "port": 9117,
+                "url": f"http://{docker_host_ip}:9117/api/v2.0/server/config",
+                "public_url": "http://localhost:9117",
+                "version": "0.21.1",
+                "container_name": "jackett"
+            },
+            {
+                "name": "RDTClient",
+                "description": "Client Real-Debrid",
+                "host": docker_host_ip,
+                "port": 6500,
+                "url": f"http://{docker_host_ip}:6500",
+                "public_url": "http://localhost:6500",
+                "version": "2.0.0",
+                "container_name": "rdtclient"
+            }
+        ]
+        
+        # Récupérer l'heure actuelle pour lastCheck
+        current_time = datetime.now().isoformat()
+        
+        # Tester chaque service de manière asynchrone
+        tasks = []
+        for config in service_configs:
+            tasks.append(check_service_status(config))
+        
+        # Attendre tous les résultats
+        service_results = await asyncio.gather(*tasks, return_exceptions=True)
+        
+        # Construire la liste des services
+        for i, config in enumerate(service_configs):
+            result = service_results[i]
+            
+            if isinstance(result, Exception):
+                # En cas d'exception lors du test
+                logger.error(f"Erreur lors du test du service {config['name']}: {result}")
+                status = "offline"
+                response_time = None
+                is_healthy = False
+            else:
+                is_healthy, response_time = result
+                status = "online" if is_healthy else "offline"
+            
+            service = ServiceResponse(
+                name=config["name"],
+                status=status,
+                description=config["description"],
+                url=config.get("public_url"),
+                version=config.get("version"),
+                lastCheck=current_time,
+                responseTime=response_time,
+                uptime=None,  # On ne peut pas facilement obtenir l'uptime des autres conteneurs
+                cpu_usage=None,  # Idem pour CPU
+                memory_usage=None,  # Idem pour mémoire
+                port=config.get("port")
+            )
+            
+            services.append(service)
+        
+        logger.info(f"Récupéré {len(services)} services")
+        return services
+        
+    except Exception as e:
+        logger.error(f"Erreur lors de la récupération des services: {e}")
+        # En cas d'erreur, retourner une liste vide
+        return []
+
+async def check_service_status(config: Dict) -> tuple[bool, Optional[int]]:
+    """Vérifie le statut d'un service spécifique"""
+    try:
+        # D'abord, tester la connectivité du port
+        port_open = await check_port_connectivity(config["host"], config["port"], timeout=3.0)
+        
+        if not port_open:
+            return False, None
+        
+        # Si le port est ouvert, tester l'endpoint HTTP si disponible
+        if "url" in config:
+            return await check_http_health(config["url"], timeout=5.0)
+        else:
+            # Port ouvert mais pas d'endpoint HTTP - considérer comme en ligne
+            return True, 50  # Temps de réponse simulé
+            
+    except Exception as e:
+        logger.debug(f"Erreur lors du test de {config['name']}: {e}")
+        return False, None
 
 @app.get("/api/logs")
 async def get_logs():
@@ -375,16 +642,43 @@ async def get_logs():
         print(f"Erreur lors de la lecture des logs: {e}")
         return {"logs": [f"Erreur: {str(e)}"]}
 
+@app.post("/api/admin/sync-torrents")
+async def sync_torrents():
+    """Lance la synchronisation des torrents via la file d'attente"""
+    job_id = await queue_service.enqueue_task("sync_torrents_task")
+    if job_id:
+        return {"success": True, "message": "Synchronisation des torrents démarrée", "job_id": job_id}
+    else:
+        return {"success": False, "message": "Erreur lors du lancement de la synchronisation"}
+
+@app.post("/api/admin/update-quotas")
+async def update_quotas():
+    """Lance la mise à jour des quotas via la file d'attente"""
+    job_id = await queue_service.enqueue_task("update_quotas_task")
+    if job_id:
+        return {"success": True, "message": "Mise à jour des quotas démarrée", "job_id": job_id}
+    else:
+        return {"success": False, "message": "Erreur lors du lancement de la mise à jour"}
+
+@app.get("/api/admin/job/{job_id}")
+async def get_job_status(job_id: str):
+    """Récupère le statut d'une tâche"""
+    status = await queue_service.get_job_status(job_id)
+    if status:
+        return status
+    else:
+        raise HTTPException(status_code=404, detail="Tâche non trouvée")
+
 @app.post("/api/admin/update-torrents")
 async def update_torrents(background_tasks: BackgroundTasks):
-    """Met à jour les torrents en arrière-plan"""
+    """Met à jour les torrents en arrière-plan (legacy - sera supprimé)"""
     # TODO: Implémenter la logique de mise à jour
     background_tasks.add_task(lambda: print("Mise à jour des torrents démarrée"))
     return {"success": True, "message": "Mise à jour des torrents démarrée"}
 
 @app.post("/api/admin/sync")
 async def sync_with_real_debrid(background_tasks: BackgroundTasks):
-    """Synchronise avec Real-Debrid en arrière-plan"""
+    """Synchronise avec Real-Debrid en arrière-plan (legacy - sera supprimé)"""
     # TODO: Implémenter la logique de synchronisation
     background_tasks.add_task(lambda: print("Synchronisation Real-Debrid démarrée"))
     return {"success": True, "message": "Synchronisation Real-Debrid démarrée"}

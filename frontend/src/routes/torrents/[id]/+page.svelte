@@ -1,8 +1,15 @@
 <script lang="ts">
 	import type { PageData } from './$types';
-	import { Progress } from '@skeletonlabs/skeleton';
+	import { ProgressBar } from '@skeletonlabs/skeleton';
+	import { onMount } from 'svelte';
 
 	export let data: PageData;
+
+	let isMounted = false;
+
+	onMount(() => {
+		isMounted = true;
+	});
 
 	// Fonction utilitaire pour convertir les octets en Go
 	function bytesToGB(bytes: number): string {
@@ -62,7 +69,7 @@
 					<!-- Statut -->
 					<div class="space-y-2">
 						<h3 class="h4">Statut</h3>
-						<span class="badge preset-tonal-primary text-lg">
+						<span class="badge preset-tonal-primary text-sm">
 							{data.torrent.status || 'Inconnu'}
 						</span>
 					</div>
@@ -74,10 +81,12 @@
 							<div class="text-xl font-semibold">
 								{data.torrent.progress || 0}%
 							</div>
-							<Progress 
-								value={data.torrent.progress || 0} 
-								max={100}
-							/>
+							{#if isMounted}
+								<Progress 
+									value={data.torrent.progress || 0} 
+									max={100}
+								/>
+							{/if}
 						</div>
 					</div>
 				</div>
@@ -113,10 +122,12 @@
 												<div class="text-sm">
 													{file.progress || 0}%
 												</div>
-												<Progress 
-													value={file.progress || 0} 
-													max={100}
-												/>
+												{#if isMounted}
+													<Progress 
+														value={file.progress || 0} 
+														max={100}
+													/>
+												{/if}
 											</div>
 										</td>
 									</tr>
@@ -141,7 +152,9 @@
 		<div class="flex items-center justify-center p-12">
 			<div class="text-center space-y-4">
 				<div class="text-lg">Chargement des détails...</div>
-				<Progress value={undefined} />
+				{#if isMounted}
+					<Progress value={undefined} />
+				{/if}
 			</div>
 		</div>
 	{/if}

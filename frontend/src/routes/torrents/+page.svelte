@@ -1,11 +1,18 @@
 <script lang="ts">
 	import type { PageData } from './$types';
-	import { Progress } from '@skeletonlabs/skeleton';
 	import TorrentAddModal from '$lib/components/TorrentAddModal.svelte';
+	import TorrentCard from '$lib/components/TorrentCard.svelte';
+	import StatCard from '$lib/components/StatCard.svelte';
+	import { onMount } from 'svelte';
 
 	export let data: PageData;
 
 	let showModal = false;
+	let isMounted = false;
+
+	onMount(() => {
+		isMounted = true;
+	});
 
 	// Fonction utilitaire pour convertir les octets en Go
 	function bytesToGB(bytes: number): string {
@@ -18,6 +25,31 @@
 		if (bytes < 1024 ** 2) return `${(bytes / 1024).toFixed(1)} KB`;
 		if (bytes < 1024 ** 3) return `${(bytes / (1024 ** 2)).toFixed(1)} MB`;
 		return `${bytesToGB(bytes)} GB`;
+	}
+
+	// Utilitaires pour les statistiques
+	function getTotalDownloaded(): string {
+		if (!data.torrents || data.torrents.length === 0) return '0 GB';
+		const total = data.torrents.reduce((sum, torrent) => {
+			return sum + (torrent.size * torrent.progress / 100);
+		}, 0);
+		return formatSize(total);
+	}
+
+	function getActiveTorrents(): number {
+		if (!data.torrents) return 0;
+		return data.torrents.filter(t => t.status === 'downloading' || t.status === 'téléchargement').length;
+	}
+
+	function getCompletedTorrents(): number {
+		if (!data.torrents) return 0;
+		return data.torrents.filter(t => t.status === 'completed' || t.status === 'terminé').length;
+	}
+
+	function getAverageProgress(): number {
+		if (!data.torrents || data.torrents.length === 0) return 0;
+		const total = data.torrents.reduce((sum, torrent) => sum + torrent.progress, 0);
+		return Math.round(total / data.torrents.length);
 	}
 
 	// Fonction de suppression d'un torrent
@@ -58,110 +90,151 @@
 	}
 </script>
 
-<div class="p-8 space-y-6">
-	<div class="flex justify-between items-center">
-		<h1 class="h1">Gestion des Torrents</h1>
+<svelte:head>
+	<title>Torrents - Redriva</title>
+</svelte:head>
+
+<div class="space-y-6">
+	<!-- Header -->
+	<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+		<div class="space-y-2">
+			<h1 class="h1">Gestion des Torrents</h1>
+			<p class="text-surface-500">Gérez vos téléchargements et votre collection</p>
+		</div>
 		<button 
-			class="btn preset-filled-primary"
+			class="btn variant-filled-primary mt-4 sm:mt-0"
 			on:click={openAddModal}
 		>
-			Ajouter un Torrent
+			<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+				<path d="M19,13H13V19H11V13H5V11H11V5H13V11H19V13Z"/>
+			</svg>
+			<span>Ajouter un Torrent</span>
 		</button>
 	</div>
 
 	{#if data.error}
 		<!-- Cas d'erreur -->
-		<div class="alert preset-filled-error">
+		<div class="alert variant-filled-error">
+			<svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+				<path d="M13,13H11V7H13M13,17H11V15H13M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2Z"/>
+			</svg>
 			<div class="alert-message">
-				<h3>Erreur de chargement</h3>
+				<h3 class="h3">Erreur de chargement</h3>
 				<p>{data.error}</p>
 			</div>
 		</div>
 	{:else if data.torrents && data.torrents.length > 0}
-		<!-- Cas de succès - Affichage du tableau des torrents -->
-		<div class="card">
-			<div class="table-container">
-				<table class="table table-hover">
-					<thead>
-						<tr>
-							<th>Nom</th>
-							<th>Taille</th>
-							<th>Progression</th>
-							<th>Statut</th>
-							<th>Actions</th>
-						</tr>
-					</thead>
-					<tbody>
-						{#each data.torrents as torrent}
-							<tr 
-								class="cursor-pointer hover:bg-surface-hover-token"
-								on:click={() => window.location.href = `/torrents/${torrent.id}`}
-							>
-								<td class="font-medium">
-									{torrent.name || 'Nom non disponible'}
-								</td>
-								<td>
-									{torrent.size ? formatSize(torrent.size) : 'N/A'}
-								</td>
-								<td class="min-w-32">
-									<div class="space-y-1">
-										<div class="text-sm">
-											{torrent.progress || 0}%
-										</div>
-										<Progress 
-											value={torrent.progress || 0} 
-											max={100}
-										/>
-									</div>
-								</td>
-								<td>
-									<span class="badge preset-tonal-primary">
-										{torrent.status || 'Inconnu'}
-									</span>
-								</td>
-								<td>
-									<button 
-										class="btn preset-filled-error btn-sm"
-										on:click|stopPropagation={() => deleteTorrent(torrent.id)}
-									>
-										Supprimer
-									</button>
-								</td>
-							</tr>
-						{/each}
-					</tbody>
-				</table>
-			</div>
+		<!-- Statistiques des torrents -->
+		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+			<StatCard
+				title="Total"
+				value="{data.torrents.length}"
+				subtitle="torrents"
+				icon="download"
+				variant="primary"
+				size="sm"
+			/>
+			<StatCard
+				title="Actifs"
+				value="{getActiveTorrents()}"
+				subtitle="en téléchargement"
+				icon="arrow-down"
+				variant="secondary"
+				size="sm"
+				trend={getActiveTorrents() > 0 ? 'up' : 'stable'}
+			/>
+			<StatCard
+				title="Terminés"
+				value="{getCompletedTorrents()}"
+				subtitle="prêts"
+				icon="check"
+				variant="success"
+				size="sm"
+			/>
+			<StatCard
+				title="Progression"
+				value="{getAverageProgress()}%"
+				subtitle="moyenne"
+				icon="progress"
+				variant="tertiary"
+				size="sm"
+				progress={getAverageProgress()}
+			/>
+		</div>
+
+		<!-- Liste des torrents avec TorrentCard -->
+		<div class="space-y-4">
+			{#each data.torrents as torrent}
+				<TorrentCard
+					id={torrent.id}
+					name={torrent.name || 'Nom non disponible'}
+					status={torrent.status === 'téléchargement' ? 'downloading' : 
+							torrent.status === 'terminé' ? 'completed' : 
+							torrent.status === 'en pause' ? 'paused' : 
+							torrent.status === 'erreur' ? 'error' : 'waiting'}
+					progress={torrent.progress || 0}
+					size={torrent.size ? formatSize(torrent.size) : 'N/A'}
+					downloadSpeed={torrent.downloadSpeed}
+					uploadSpeed={torrent.uploadSpeed}
+					eta={torrent.eta}
+					seeders={torrent.seeders}
+					leechers={torrent.leechers}
+					priority={torrent.priority || 'normal'}
+				/>
+			{/each}
 		</div>
 	{:else if data.torrents && data.torrents.length === 0}
 		<!-- Cas de liste vide -->
-		<div class="card p-8">
-			<div class="text-center space-y-4">
-				<div class="text-lg">Aucun torrent trouvé</div>
-				<div class="text-sm text-surface-500">
-					La liste des torrents est vide.
-				</div>
-			</div>
+		<div class="card">
+			<section class="p-12 text-center">
+				<svg class="w-16 h-16 mx-auto text-surface-400 mb-4" fill="currentColor" viewBox="0 0 24 24">
+					<path d="M9.5,3A6.5,6.5 0 0,1 16,9.5C16,11.11 15.41,12.59 14.44,13.73L14.71,14H15.5L20.5,19L19,20.5L14,15.5V14.71L13.73,14.44C12.59,15.41 11.11,16 9.5,16A6.5,6.5 0 0,1 3,9.5A6.5,6.5 0 0,1 9.5,3M9.5,5C7,5 5,7 5,9.5C5,12 7,14 9.5,14C12,14 14,12 14,9.5C14,7 12,5 9.5,5Z"/>
+				</svg>
+				<h3 class="h3 mb-2">Aucun torrent trouvé</h3>
+				<p class="text-surface-500 mb-4">
+					La liste des torrents est vide. Commencez par ajouter votre premier torrent.
+				</p>
+				<button 
+					class="btn variant-filled-primary"
+					on:click={openAddModal}
+				>
+					<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+						<path d="M19,13H13V19H11V13H5V11H11V5H13V11H19V13Z"/>
+					</svg>
+					<span>Ajouter un Torrent</span>
+				</button>
+			</section>
 		</div>
 	{:else}
 		<!-- Cas de chargement -->
-		<div class="flex items-center justify-center p-12">
-			<div class="text-center space-y-4">
-				<div class="text-lg">Chargement des torrents...</div>
-				<Progress value={undefined} />
-			</div>
+		<div class="card">
+			<section class="p-12">
+				<div class="flex items-center justify-center">
+					<div class="animate-spin w-8 h-8 mr-3">
+						<svg fill="currentColor" viewBox="0 0 24 24">
+							<path d="M12,4V2A10,10 0 0,0 2,12H4A8,8 0 0,1 12,4Z"/>
+						</svg>
+					</div>
+					<span class="text-surface-500">Chargement des torrents...</span>
+				</div>
+			</section>
 		</div>
 	{/if}
 </div>
 
 <!-- Modale d'ajout de torrent -->
 {#if showModal}
-	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-		<div class="bg-surface-100-800-token rounded-lg p-6 max-w-md w-full mx-4">
-			<TorrentAddModal 
-				on:torrentAdded={handleTorrentAdded}
-				on:cancel={handleCancel}
-			/>
+	<div class="fixed inset-0 z-[999] flex items-center justify-center bg-surface-backdrop-token backdrop-blur-sm">
+		<div class="card w-full max-w-md mx-4">
+			<section class="card-header">
+				<h3 class="h3">Ajouter un nouveau torrent</h3>
+			</section>
+			<section class="p-6">
+				<TorrentAddModal 
+					on:torrentAdded={handleTorrentAdded}
+					on:cancel={handleCancel}
+				/>
+			</section>
 		</div>
 	</div>
 {/if}

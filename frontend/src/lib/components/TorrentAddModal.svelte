@@ -1,6 +1,4 @@
 <script lang="ts">
-	// Pour Skeleton UI v3, nous utiliserons une approche plus simple
-	// avec un système d'événements personnalisé
 	import { createEventDispatcher } from 'svelte';
 
 	const dispatch = createEventDispatcher();
@@ -43,16 +41,11 @@
 	}
 </script>
 
-<div class="space-y-6">
-	<h3 class="h3">Ajouter un Torrent</h3>
-	
-	<form on:submit|preventDefault={handleSubmit} class="space-y-4">
-		<div>
-			<label for="magnet-url" class="block text-sm font-medium mb-2">
-				Lien Magnet *
-			</label>
+<form on:submit|preventDefault={handleSubmit} class="space-y-6">
+	<div class="space-y-3">
+		<label class="label">
+			<span class="font-medium">Lien Magnet *</span>
 			<input
-				id="magnet-url"
 				type="text"
 				bind:value={magnetUrl}
 				placeholder="magnet:?xt=urn:btih:..."
@@ -60,27 +53,39 @@
 				required
 				disabled={isSubmitting}
 			/>
-			<p class="text-sm text-surface-500 mt-1">
-				Collez votre lien magnet pour ajouter le torrent
-			</p>
-		</div>
+		</label>
+		<p class="text-sm text-surface-500">
+			Collez votre lien magnet pour ajouter le torrent à Real-Debrid
+		</p>
+	</div>
 
-		<div class="flex justify-end space-x-3">
-			<button
-				type="button"
-				class="btn preset-outlined-surface"
-				on:click={handleCancel}
-				disabled={isSubmitting}
-			>
-				Annuler
-			</button>
-			<button
-				type="submit"
-				class="btn preset-filled-primary"
-				disabled={!magnetUrl.trim() || isSubmitting}
-			>
-				{isSubmitting ? 'Ajout en cours...' : 'Ajouter'}
-			</button>
-		</div>
-	</form>
-</div>
+	<div class="flex justify-end space-x-3">
+		<button
+			type="button"
+			class="btn variant-ghost-surface"
+			on:click={handleCancel}
+			disabled={isSubmitting}
+		>
+			<span>Annuler</span>
+		</button>
+		<button
+			type="submit"
+			class="btn variant-filled-primary"
+			disabled={!magnetUrl.trim() || isSubmitting}
+		>
+			{#if isSubmitting}
+				<div class="animate-spin w-4 h-4 mr-2">
+					<svg fill="currentColor" viewBox="0 0 24 24">
+						<path d="M12,4V2A10,10 0 0,0 2,12H4A8,8 0 0,1 12,4Z"/>
+					</svg>
+				</div>
+				<span>Ajout en cours...</span>
+			{:else}
+				<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+					<path d="M19,13H13V19H11V13H5V11H11V5H13V11H19V13Z"/>
+				</svg>
+				<span>Ajouter</span>
+			{/if}
+		</button>
+	</div>
+</form>
