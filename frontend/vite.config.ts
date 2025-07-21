@@ -24,8 +24,10 @@ export default defineConfig({
 				timeout: 10000
 			}
 		},
-		// Configuration sécurisée pour le développement
-		host: '0.0.0.0', // Remplacé par localhost en production via Dockerfile
+		// SÉCURITÉ: En développement, bind seulement sur localhost
+		// host: '0.0.0.0' exposerait le serveur sur toutes les interfaces
+		// ce qui est un risque de sécurité en développement
+		host: '127.0.0.1', // ✅ Localhost uniquement pour sécurité
 		port: 5173,
 		strictPort: true
 	},
