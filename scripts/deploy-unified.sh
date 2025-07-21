@@ -45,7 +45,7 @@ log_step() {
 check_prerequisites() {
     log_step "Vérification des prérequis"
     
-    local required_commands=("docker" "docker-compose" "git")
+    local required_commands=("docker" "git")
     local missing_commands=()
     
     for cmd in "${required_commands[@]}"; do
@@ -55,6 +55,13 @@ check_prerequisites() {
             log "✓ $cmd installé"
         fi
     done
+    
+    # Vérifier Docker Compose (nouvelle syntaxe)
+    if docker compose version >/dev/null 2>&1; then
+        log "✓ docker compose installé"
+    else
+        missing_commands+=("docker-compose")
+    fi
     
     if [ ${#missing_commands[@]} -ne 0 ]; then
         log_error "Commandes manquantes: ${missing_commands[*]}"

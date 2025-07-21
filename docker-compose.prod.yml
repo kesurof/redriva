@@ -7,8 +7,8 @@ services:
     image: nginx:alpine
     container_name: redriva-proxy
     ports:
-      - "80:80"
-      - "443:443"
+      - "0.0.0.0:3000:80"
+      - "0.0.0.0:3443:443"
     volumes:
       - ./proxy/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./proxy/conf.d:/etc/nginx/conf.d:ro
@@ -45,7 +45,6 @@ services:
       context: ./backend
       dockerfile: Dockerfile.prod
     image: redriva/backend:latest
-    container_name: redriva-backend
     volumes:
       - redriva-data:/app/data
       - redriva-logs:/app/logs
@@ -80,7 +79,6 @@ services:
       context: ./backend
       dockerfile: Dockerfile.prod
     image: redriva/backend:latest
-    container_name: redriva-worker
     command: ["arq", "services.queue_service.WorkerSettings"]
     volumes:
       - redriva-data:/app/data
@@ -115,7 +113,6 @@ services:
       context: ./frontend
       dockerfile: Dockerfile.prod
     image: redriva/frontend:latest
-    container_name: redriva-frontend
     networks:
       - redriva-frontend
     depends_on:
