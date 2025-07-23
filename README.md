@@ -1,326 +1,267 @@
+# 🎬 Redriva - Gestionnaire Real-Debrid Moderne
 
-# Redriva – Gestionnaire Real-Debrid moderne
+> **Tableau de bord unifié pour la gestion d'un écosystème média auto-hébergé**
 
-Redriva est une application web complète pour gérer, visualiser et automatiser vos torr## Structure du projet
-- `frontend/` : co### 4. Accéder à l'application
-- **Frontend** : [htt## 🚀 Démarrage Rapide
+Redriva est une application web moderne qui simplifie la gestion de vos téléchargements Real-Debrid avec une interface élégante et des fonctionnalités avancées de monitoring.
 
-### Développement
+## ✨ Fonctionnalités
+
+- 🎯 **Interface moderne** - Vue.js 3 + Vuetify Material Design
+- 🔄 **Gestion des torrents** - Ajout, suivi et téléchargement automatisé
+- 📊 **Monitoring en temps réel** - Métriques Prometheus intégrées
+- 🔐 **Authentification sécurisée** - Intégration Real-Debrid OAuth
+- 🐳 **Déploiement simplifié** - Docker avec scripts ultra-simplifiés
+- ⚡ **Performance optimisée** - Cache Redis et workers asynchrones
+
+## 🚀 Démarrage Rapide
+
+### Prérequis
+- Docker et Docker Compose
+- Token Real-Debrid ([obtenir ici](https://real-debrid.com/apitoken))
+
+### Installation Express (Développement)
+
 ```bash
-# Cloner le projet
+# 1. Cloner le projet
 git clone https://github.com/kesurof/redriva.git
 cd redriva
 
-# Configurer (optionnel)
+# 2. Configuration (optionnelle)
 cp .env.example .env
+# Éditer .env avec votre token Real-Debrid
 
-# Démarrer
+# 3. Démarrage en une commande
 ./scripts/dev.sh start
 
-# Accès
-# Frontend: http://localhost:5174
-# Backend: http://localhost:8080/api
+# 4. Accès immédiat
+# 🌐 Interface: http://localhost:5174
+# 🔧 API: http://localhost:8080/api
+```
+
+### Déploiement Production
+
+```bash
+# 1. Configuration production
+cp .env.prod.example .env.prod
+# Éditer .env.prod avec vos valeurs
+
+# 2. Déploiement en une commande
+./scripts/deploy.sh deploy
+
+# 3. Accès sécurisé
+# 🌐 Application: http://localhost:3000
+```
+
+## 🛠️ Commandes Essentielles
+
+### Développement
+```bash
+./scripts/dev.sh start      # 🚀 Démarrer l'environnement
+./scripts/dev.sh stop       # ⏹️  Arrêter l'environnement
+./scripts/dev.sh logs       # 📋 Voir les logs en temps réel
+./scripts/dev.sh shell      # 🐚 Accéder au shell backend
+./scripts/dev.sh test       # 🧪 Lancer tous les tests
+./scripts/dev.sh rebuild    # 🔄 Reconstruire complètement
 ```
 
 ### Production
 ```bash
-# Configurer production
-cp .env.prod.example .env.prod
-# Éditer .env.prod avec vos valeurs
-
-# Déployer
-./scripts/deploy.sh deploy
-
-# Accès: http://localhost:3000
+./scripts/deploy.sh deploy  # 🚀 Déployer en production
+./scripts/deploy.sh status  # 📊 Voir le statut des services
+./scripts/deploy.sh logs    # 📋 Logs de production
+./scripts/deploy.sh stop    # ⏹️  Arrêter la production
 ```
 
-## 🛠️ Commandes Utiles
+## 🏗️ Architecture
 
-```bash
-# Développement
-./scripts/dev.sh start      # Démarrer
-./scripts/dev.sh stop       # Arrêter
-./scripts/dev.sh rebuild    # Reconstruire
-./scripts/dev.sh logs       # Voir logs
-./scripts/dev.sh shell      # Accéder au shell
+Redriva utilise une **architecture unifiée révolutionnaire** basée sur la philosophie **"Zéro Réécriture de Code"** :
 
-# Production
-./scripts/deploy.sh deploy  # Déployer
-./scripts/deploy.sh stop    # Arrêter
-./scripts/deploy.sh logs    # Voir logs
-./scripts/deploy.sh status  # Statut
+### Stack Technique
+```
+Frontend  → Vue.js 3 + Vuetify + TypeScript
+Backend   → FastAPI + Python 3.12 + SQLite
+Cache     → Redis + ARQ (jobs asynchrones)
+Proxy     → Nginx (production)
+Deploy    → Docker + Scripts simplifiés
 ```
 
-## 📁 Architecture Simplifiée
+### Principe Fondamental
+- **Le même code** s'exécute en développement ET en production
+- **Seule la configuration** Docker change
+- **Un seul Dockerfile** par service (multi-stage)
+- **Complexité divisée par 3** grâce aux scripts unifiés
 
 ```
+📁 Structure Simplifiée
 redriva/
-├── backend/           # API FastAPI + Python
-├── frontend/          # Interface Vue.js + Vuetify
-├── scripts/           # Scripts dev/prod
-├── docker-compose.yml # Configuration développement
+├── frontend/           # Interface Vue.js + Vuetify
+├── backend/            # API FastAPI + logique métier
+├── scripts/            # Scripts dev.sh + deploy.sh
+├── docs/               # Documentation complète
+├── docker-compose.yml  # Configuration développement
 └── docker-compose.prod.yml # Configuration production
 ```
 
-**Principe fondamental :** Un seul Dockerfile par service, configurations différentes via docker-compose.
+## 📱 Pages Disponibles
 
-```
-redriva/
-├── frontend/               # Application Vue.js 3 + Vuetify (UI moderne)
-│   ├── src/
-│   │   ├── components/    # Composants réutilisables
-│   │   ├── views/         # Pages et vues
-│   │   ├── composables/   # Stores et logique réactive
-│   │   └── main.ts        # Point d'entrée principal
-│   ├── Dockerfile         # Image de production
-│   └── nginx.conf.template # Configuration Nginx sécurisée
-├── backend/               # API FastAPI (serveur robuste)
-│   ├── app.py             # Application principale
-│   ├── services/          # Services métier
-│   │   ├── monitoring.py  # Métriques Prometheus
-│   │   └── realdebrid.py  # Intégration Real-Debrid
-│   ├── database/          # Gestion des données
-│   └── Dockerfile         # Image de production
-├── scripts/               # Scripts d'automatisation
-│   ├── deploy-unified.sh  # Déploiement orchestré
-│   ├── security-audit.sh  # Audit de sécurité
-│   ├── update-deps.sh     # Mise à jour des dépendances
-│   ├── performance-test.sh # Tests de performance
-│   ├── validate.sh        # Validation complète
-│   └── README.md          # Documentation des scripts
-├── .github/workflows/     # CI/CD GitHub Actions
-│   └── security-audit.yml # Workflow de sécurité
-├── docs/                  # Documentation technique
-└── docker-compose.yml     # Orchestration complète
-```
+| Page | URL | Description |
+|------|-----|-------------|
+| **Dashboard** | `/` | Tableau de bord principal avec vue d'ensemble |
+| **Torrents** | `/torrents` | Gestion et suivi des téléchargements |
+| **Services** | `/services` | Monitoring des services connectés |
+| **Paramètres** | `/settings` | Configuration et préférences |
+| **Démonstration** | `/demo` | Tests et démonstrations des fonctionnalités |
 
-## ⚡ Démarrage rapide
+## 🔧 Configuration
 
-### Validation et déploiement automatique
+### Variables d'Environnement
+
+**Développement (`.env`) :**
 ```bash
-# 1. Installation automatisée (recommandée)
-git clone https://github.com/kesurof/redriva.git
-cd redriva
-./build-complete.sh
+# Real-Debrid
+RD_TOKEN=votre_token_real_debrid
 
-# 2. Accès à l'application
-# Frontend: http://localhost:5174
-# API: http://localhost:8080
-# Métriques: http://localhost:8080/metrics
+# Base de données
+DB_PATH=./data/redriva.db
+
+# Redis
+REDIS_URL=redis://redis:6379/0
+
+# Logs
+LOG_LEVEL=DEBUG
 ```
 
-### Déploiement manuel
+**Production (`.env.prod`) :**
 ```bash
-# Construction et démarrage
-docker compose up -d --build
+# Real-Debrid (OBLIGATOIRE)
+RD_TOKEN=votre_token_real_debrid
 
-# Vérification des services
-docker compose ps
-curl http://localhost:8080/api/ping
+# Production optimisée
+ENVIRONMENT=production
+LOG_LEVEL=INFO
+DB_PATH=/app/data/redriva.db
+REDIS_URL=redis://redis:6379/0
 ```
 
-## 🔧 Scripts d'Automatisation
+### Ports par Défaut
 
-Redriva inclut une suite complète de scripts pour automatiser la maintenance, la sécurité et le déploiement :
+| Service | Développement | Production |
+|---------|---------------|------------|
+| **Frontend** | `5174` | `3000` (via proxy) |
+| **Backend** | `8080` | `3000/api` (via proxy) |
+| **Redis** | `6379` (interne) | `6379` (interne) |
 
-### Scripts Principaux
-| Script | Description | Usage |
-|--------|-------------|-------|
-| `validate.sh` | Validation complète du projet | `./scripts/validate.sh` |
-| `deploy-unified.sh` | Déploiement orchestré | `./scripts/deploy-unified.sh deploy` |
-| `security-audit.sh` | Audit de sécurité automatisé | `./scripts/security-audit.sh` |
-| `update-deps.sh` | Mise à jour des dépendances | `./scripts/update-deps.sh` |
-| `performance-test.sh` | Tests de performance | `./scripts/performance-test.sh` |
+## 🧪 Tests et Qualité
 
-### Workflows Automatisés
-
-**Développement :**
 ```bash
-# Audit + Déploiement dev + Tests
-./scripts/security-audit.sh
-./scripts/deploy-unified.sh deploy --environment development
-./scripts/performance-test.sh --load-only
+# Tests Frontend (Vue.js + Vitest)
+./scripts/dev.sh shell frontend
+npm run test
+
+# Tests Backend (Python + Pytest)
+./scripts/dev.sh shell
+python -m pytest
+
+# Qualité du code
+./scripts/dev.sh lint
+
+# Tests complets
+./scripts/dev.sh test
 ```
 
-**Production :**
+## 🚨 Dépannage
+
+### Problèmes Courants
+
+**Services ne démarrent pas :**
 ```bash
-# Validation complète + Déploiement sécurisé
-./scripts/validate.sh
-./scripts/deploy-unified.sh deploy --performance-tests
+./scripts/dev.sh rebuild
 ```
 
-**Maintenance mensuelle :**
+**Erreurs de dépendances :**
 ```bash
-# Mise à jour + Audit + Tests
-./scripts/update-deps.sh
-./scripts/security-audit.sh
-./scripts/performance-test.sh
+./scripts/dev.sh shell frontend
+npm install
+# Puis reconstruire
+docker compose build frontend
 ```
 
-📖 **Documentation complète :** [`scripts/README.md`](scripts/README.md)naire Real-Debrid moderne
-
-Redriva est une application web complète pour gérer, visualiser et automatiser vos torrents et téléchargements Real-Debrid, avec une interface moderne, sécurisée et évolutive.
-
-## Fonctionnalités principales
-- Tableau de bord (stats, filtres, alertes, logs, quotas)
-- File d’attente et gestion des priorités (ajout, suppression, actions, polling)
-- Ajout/suppression de torrents, visualisation détaillée
-- Scraper intégré, gestion en masse, détection liens morts
-- Internationalisation (i18n), dark mode, responsive
-- Sécurité avancée (token jamais côté client, logs, rate limiting)
-- Tests unitaires, E2E, CI/CD, documentation complète
-
-## Structure du projet
-- `frontend/` : code source SvelteKit (UI, composants, pages)
-- `backend/` : code source FastAPI (API, modèles, sécurité)
-- `docs/` : documentation technique, guides, FAQ, déploiement
-- `tests/` : tests unitaires, intégration, E2E
-- `scripts/` : scripts utilitaires, maintenance
-- `config/` : fichiers de configuration et secrets (jamais committer)
-- `logs/` : logs applicatifs persistants
-- `data/` : base de données et données persistantes
-- `systemd/` : fichiers d’unités systemd (déploiement classique)
-
-
-## Procédure post-build Docker (serveur de test)
-
-Après avoir build les images Docker, suivez ces étapes pour lancer et vérifier Redriva :
-
-### 1. Configurer les variables d’environnement
-- Vérifiez que le fichier `config/.env` contient bien la variable `RD_TOKEN` (token Real-Debrid) côté backend.
-- Vérifiez les autres variables nécessaires (chemins, options spécifiques).
-
-### 2. Lancer les services
-Dans le dossier du projet :
-```sh
-docker compose up -d
-```
-Cela démarre les services backend et frontend en mode détaché.
-
-### 3. Vérifier l’état des services
-```sh
-docker compose ps
-```
-Les deux services doivent être en statut `running` ou `healthy`.
-
-### 4. Accéder à l’application
-- **Frontend** : [http://localhost:4173](http://localhost:4173) (ou l’IP/nom du serveur si distant)
-- **Backend (API)** : [http://localhost:8000/api/ping](http://localhost:8000/api/ping)
-
-### 5. Logs et débogage
-Pour consulter les logs en temps réel :
-```sh
-docker compose logs -f
+**Base de données corrompue :**
+```bash
+./scripts/dev.sh db:reset
 ```
 
-### 6. Arrêter les services
-Pour arrêter proprement :
-```sh
-docker compose down
+**Nettoyage complet :**
+```bash
+docker compose down --rmi all
+rm -rf frontend/node_modules
+./scripts/dev.sh start
 ```
 
-### 7. Checklist post-déploiement
-- Vérifiez que l’interface frontend s’affiche et communique bien avec le backend.
-- Testez une action clé (connexion, affichage des torrents, etc.).
-- Contrôlez les logs pour détecter d’éventuelles erreurs ou warnings.
+### Logs et Monitoring
 
----
+```bash
+# Logs en temps réel
+./scripts/dev.sh logs
 
-### Prérequis
-- Docker et Docker Compose installés
-- Un token Real-Debrid valide (à placer dans `config/.env`)
+# Logs spécifiques
+./scripts/dev.sh logs backend
+./scripts/dev.sh logs frontend
 
-### Déploiement local complet
-1. Clonez le dépôt et placez-vous à la racine du projet :
-   ```sh
-   git clone https://github.com/kesurof/redriva.git
-   cd redriva
-   ```
-2. Éditez le fichier `config/.env` et renseignez votre token Real-Debrid :
-   ```sh
-   nano config/.env
-   # ou utilisez votre éditeur préféré
-   # Remplacez la valeur de RD_TOKEN=... par votre token
-   ```
-3. Lancez la stack complète (backend + frontend) :
-   ```sh
-   docker compose build
-   docker compose up -d
-   ```
-4. Vérifiez que les services sont bien démarrés :
-   ```sh
-   docker compose ps
-   docker compose logs -f frontend
-   docker compose logs -f backend
-   ```
-5. Accédez à l’interface web :
-   - Frontend : [http://localhost:5173](http://localhost:5173)
-   - API backend : [http://localhost:8000](http://localhost:8000)
+# Monitoring des performances
+./scripts/dev.sh monitor
+```
 
-> Les données (SQLite) et logs sont persistés dans les dossiers `data/` et `logs/` montés en volume.
+## 🔒 Sécurité
 
-### Déploiement production/cloud (recommandé)
-1. **Reverse proxy HTTPS** : ajoutez un service nginx/caddy/traefik dans `docker-compose.yml` pour :
-   - Terminer TLS (HTTPS)
-   - Router `/api` vers le backend (8000), `/` vers le frontend (5173 ou 3000)
-   - Exemple de config nginx : voir `docs/DEPLOIEMENT.md`
-2. **Variables d’environnement** : ne jamais commiter de secrets, utilisez `config/.env` monté en volume ou injecté par CI/CD.
-3. **Build & déploiement CI/CD** :
-   - Utilisez GitHub Actions ou GitLab CI pour builder les images, lancer les tests, et déployer automatiquement sur le serveur cible.
-   - Voir `.github/workflows/deploy.yml` pour un exemple.
-4. **Mise à jour** :
-   ```sh
-   git pull
-   docker compose build
-   docker compose up -d
-   ```
-5. **Sauvegardes** : sauvegardez régulièrement `data/` (base SQLite) et `logs/`.
-
-### Conseils avancés
-- Pour un déploiement systemd classique, voir `systemd/redriva.service` et la doc `docs/DEPLOIEMENT.md`.
-- Pour un déploiement cloud scalable, adaptez les ports, variables et volumes dans `docker-compose.yml`.
-- Pour un déploiement multi-utilisateurs, voir la roadmap et les guides d’authentification dans `docs/`.
-
-## Déploiement cloud & production
-- Ajoutez un reverse proxy (nginx/caddy) dans `docker-compose.yml` pour HTTPS et le routage `/api`.
-- Utilisez le playbook Ansible (`ansible/`) pour automatiser l’installation, la configuration et le déploiement.
-- Mettez en place un pipeline CI/CD (ex : `.github/workflows/deploy.yml`) pour build, test et déploiement auto.
-- Voir `docs/DEPLOIEMENT.md` pour tous les scénarios (local, systemd, cloud).
-
-## Maintenance & debug
-- Les logs applicatifs sont dans `logs/` (backend, worker, erreurs)
-- Les données sont dans `data/` (SQLite, fichiers)
-- Pour voir les logs Docker :
-  ```sh
-  docker compose logs
-  ```
-- Pour mettre à jour :
-  ```sh
-  git pull && docker compose build && docker compose up -d
-  ```
-- Voir la FAQ et le troubleshooting dans `docs/`
-
-## Contribution & ajout de fonctionnalités
-- Forkez le dépôt, créez une branche dédiée (`feature/xxx` ou `fix/xxx`)
-- Respectez la structure, documentez vos changements, ajoutez des tests
-- Toute évolution de déploiement doit être testée et documentée (`docs/DEPLOIEMENT.md`)
-- Voir le guide complet dans `docs/CONTRIBUTING.md`
-
-## Support & documentation
-- Consultez la documentation technique et la FAQ dans `docs/`
-- Ouvrez une issue pour toute question ou bug
-
----
+- ✅ **Tokens sécurisés** - Variables d'environnement uniquement
+- ✅ **Réseau isolé** - Backend inaccessible directement
+- ✅ **Validation stricte** - Toutes les entrées validées
+- ✅ **Logs structurés** - Observabilité complète
+- ✅ **Tests automatisés** - Qualité garantie
 
 ## 📚 Documentation
 
-- [Guide d'installation](docs/INSTALL.md)
-- [Guide d'utilisation](docs/USAGE.md)
-- [Contribution](docs/CONTRIBUTING.md)
-- [Dépannage](docs/TROUBLESHOOTING.md)
-- [Déploiement](docs/DEPLOIEMENT.md)
+| Document | Description |
+|----------|-------------|
+| **[Installation](docs/INSTALL.md)** | Guide d'installation détaillé |
+| **[Architecture](docs/ARCHITECTURE.md)** | Architecture technique complète |
+| **[Guide de Développement](docs/AI_DEVELOPMENT_GUIDE.md)** | Standards et bonnes pratiques |
+| **[Déploiement](docs/DEPLOIEMENT.md)** | Procédures de déploiement |
+| **[Contribution](docs/CONTRIBUTING.md)** | Guide de contribution |
+| **[API](docs/USAGE.md)** | Documentation de l'API |
 
-Pour toute question, consultez la documentation dans le dossier `docs/` ou ouvrez une issue.
+## 🤝 Contribution
+
+Nous accueillons toutes les contributions ! Consultez notre [Guide de Contribution](docs/CONTRIBUTING.md) pour commencer.
+
+### Workflow de Contribution
+1. Fork du projet
+2. Créer une branche feature (`git checkout -b feature/AmazingFeature`)
+3. Développer avec `./scripts/dev.sh`
+4. Tester avec `./scripts/dev.sh test`
+5. Commit (`git commit -m 'Add AmazingFeature'`)
+6. Push (`git push origin feature/AmazingFeature`)
+7. Ouvrir une Pull Request
+
+## 📄 Licence
+
+Ce projet est sous licence MIT. Voir le fichier [LICENSE](LICENSE) pour plus de détails.
+
+## 🌟 Remerciements
+
+- **[Real-Debrid](https://real-debrid.com/)** - Service de téléchargement premium
+- **[Vue.js](https://vuejs.org/)** - Framework frontend réactif
+- **[Vuetify](https://vuetifyjs.com/)** - Composants Material Design
+- **[FastAPI](https://fastapi.tiangolo.com/)** - Framework API moderne
+- **[Docker](https://docker.com/)** - Conteneurisation simplifiée
 
 ---
-**Sécurité : ne commitez jamais de secrets ou de tokens dans le dépôt.**
+
+<div align="center">
+
+**Redriva** - *Révolutionnant la gestion Real-Debrid*
+
+[🌐 Site Web](https://github.com/kesurof/redriva) • [📖 Documentation](docs/) • [🐛 Issues](https://github.com/kesurof/redriva/issues) • [💬 Discussions](https://github.com/kesurof/redriva/discussions)
+
+</div>
