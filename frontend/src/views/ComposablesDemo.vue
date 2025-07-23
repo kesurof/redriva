@@ -87,7 +87,7 @@
               <v-card variant="outlined">
                 <v-card-text>
                   <h4>Dernière erreur</h4>
-                  <p v-if="error" class="text-error">{{ error }}</p>
+                  <p v-if="appError" class="text-error">{{ appError }}</p>
                   <v-chip v-else color="success" prepend-icon="mdi-check">Aucune erreur</v-chip>
                 </v-card-text>
               </v-card>
@@ -190,7 +190,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+
 import { 
   useNotificationStore, 
   useAppStore, 
@@ -205,7 +205,7 @@ const authStore = useAuthStore()
 const dataStore = useDataStore()
 
 // État des notifications
-const { notifications, success, error, warning, info, clear } = notificationStore
+const { notifications, success, error: notifyError, warning, info, clear } = notificationStore
 
 // État de l'application
 const { isLoading, error: appError, setLoading, setError, clearError, refreshSystemStatus } = appStore
@@ -231,7 +231,7 @@ const showSuccessNotification = () => {
 }
 
 const showErrorNotification = () => {
-  error('Erreur !', 'Une erreur est survenue lors de l\'opération')
+  notifyError('Erreur !', 'Une erreur est survenue lors de l\'opération')
 }
 
 const showWarningNotification = () => {
@@ -252,8 +252,8 @@ const toggleLoading = () => {
 }
 
 const simulateError = () => {
-  setError('Erreur simulée pour les tests')
-  error('Erreur simulée', 'Ceci est une erreur de test')
+  setError('Une erreur de test a été simulée')
+  notifyError('Erreur simulée', 'Ceci est une erreur de test')
 }
 
 // Méthodes pour l'authentification
@@ -306,7 +306,4 @@ const addSampleQueueItem = () => {
   addToQueue(queueItem)
   info('Élément ajouté', 'Nouvel élément ajouté à la file d\'attente')
 }
-
-// Getter computed pour l'erreur d'application
-const error = computed(() => appError.value)
 </script>

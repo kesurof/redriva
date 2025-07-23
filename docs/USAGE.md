@@ -1,6 +1,11 @@
 # Guide d'utilisation Redriva
 
 ## Accès & navigation
+- Accédez à l'interface web sur [http://localhost:5174](http://localhost:5174) (développement) ou [http://localhost:3000](http://localhost:3000) (production)
+- L'API backend est disponible sur [http://localhost:8080](http://localhost:8080)
+- Connectez-vous avec votre token Real-Debrid (stocké côté serveur, jamais côté client)tilisation Redriva
+
+## Accès & navigation
 - Accédez à l'interface web sur [http://localhost:5174](http://localhost:5174) (ou port configuré)
 - L'API backend est disponible sur [http://localhost:8000](http://localhost:8000)
 - Connectez-vous avec votre token Real-Debrid (stocké côté serveur, jamais côté client)e d’utilisation Redriva

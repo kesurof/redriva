@@ -1,8 +1,15 @@
-# Architecture Redriva
+# Architecture Redriva - Approche Unifiée "Zéro Réécriture"
+
+## 🎯 Philosophie Fondamentale
+
+**Principe clé** : Le même code source s'exécute en développement ET en production. Seule la **configuration d'exécution** change.
 
 ## 📋 Vue d'ensemble
 
-Redriva est un tableau de bord unifié pour la gestion d'un écosystème média auto-hébergé, développé avec une architecture moderne découplée.
+Redriva utilise une approche **révolutionnaire** pour éliminer la double maintenance :
+- **UN SEUL** `Dockerfile` par service 
+- **MÊME CODE** pour développement et production  
+- **Configurations différentes** via Docker Compose uniquement
 
 **Stack Technique Actuel (juillet 2025) :**
 - **Frontend :** Vue.js 3 + Vuetify + TypeScript
@@ -23,8 +30,7 @@ frontend/
 │   ├── composables/      # Stores et logique réactive
 │   ├── router/           # Configuration Vue Router
 │   └── plugins/          # Configuration Vuetify et thèmes
-├── Dockerfile            # Image de développement
-└── Dockerfile.prod       # Image de production multi-stage
+└── Dockerfile            # Image unifiée multi-stage
 ```
 
 **Fonctionnalités :**
@@ -33,7 +39,7 @@ frontend/
 - ✅ Architecture Composition API réactive
 - ✅ Tests unitaires complets (Vitest + Vue Test Utils)
 - ✅ Hot reload en développement
-- ✅ Build optimisé pour production
+- ✅ Build optimisé pour production (Nginx intégré)
 
 ### Backend : API FastAPI
 
@@ -45,7 +51,8 @@ backend/
 │   ├── queue_service.py  # Gestion file d'attente
 │   └── realdebrid.py     # Intégration Real-Debrid
 ├── database/             # Couche persistance
-└── migrations/           # Scripts de migration DB
+├── migrations/           # Scripts de migration DB
+└── Dockerfile            # Image unifiée
 ```
 
 **Fonctionnalités :**
@@ -55,14 +62,14 @@ backend/
 - ✅ Queue Redis pour tâches asynchrones
 - ✅ Logging structuré et observabilité
 
-### Infrastructure Docker
+### Infrastructure Docker Unifiée
 
 **Développement :**
 ```yaml
 # docker-compose.yml
 services:
-  frontend:    # Vue.js sur port 5174
-  backend:     # FastAPI sur port 8080
+  frontend:    # Vue.js dev server sur port 5174
+  backend:     # FastAPI avec reload sur port 8080
   redis:       # Cache et queue
 ```
 
@@ -70,11 +77,11 @@ services:
 ```yaml  
 # docker-compose.prod.yml
 services:
-  proxy:       # Nginx reverse proxy (port 3000)
-  frontend:    # Vue.js optimisé
-  backend:     # FastAPI avec workers
-  redis:       # Redis persistant
+  frontend:    # Vue.js + Nginx optimisé
+  backend:     # FastAPI avec workers multiples
+  redis:       # Redis persistant optimisé
   worker:      # Workers background
+  proxy:       # Nginx reverse proxy sur port 3000
 ```
 
 ---
@@ -107,7 +114,7 @@ services:
 
 ```bash
 # Démarrage rapide
-docker compose up --build -d
+./scripts/dev.sh start
 
 # URLs d'accès
 Frontend: http://localhost:5174
@@ -118,7 +125,7 @@ Backend:  http://localhost:8080/api
 
 ```bash
 # Déploiement optimisé
-docker compose -f docker-compose.prod.yml up -d
+./scripts/deploy.sh deploy
 
 # URL d'accès unifiée
 Application: http://localhost:3000

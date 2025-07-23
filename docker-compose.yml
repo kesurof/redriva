@@ -1,20 +1,28 @@
+# Configuration Docker Compose - Développement
+# Approche unifiée "Zéro Réécriture" : même code, configuration différente
+
 services:
+  # Backend avec hot reload
   backend:
     container_name: redriva-backend
     build:
       context: ./backend
       dockerfile: Dockerfile 
     volumes:
-      - ./backend:/app 
-      - redriva-data:/app/data
-      - redriva-logs:/app/logs
+      - ./backend:/app:rw          # Code source monté pour hot reload
+      - redriva-data:/app/data     # Persistance données
+      - redriva-logs:/app/logs     # Persistance logs
     ports:
       - "8080:8000"
     networks:
       - redriva-net
     restart: unless-stopped
+    environment:
+      - ENVIRONMENT=development
+      - LOG_LEVEL=DEBUG
     env_file:
       - .env
+    # Commande développement avec rechargement à chaud
     command: uvicorn app:app --host 0.0.0.0 --port 8000 --reload
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/ping"]
@@ -23,15 +31,18 @@ services:
       retries: 5
     labels:
       - "com.redriva.service=backend"
+      - "com.redriva.env=development"
 
+  # Frontend avec hot reload
   frontend:
     container_name: redriva-frontend
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      target: development         # Utilise le stage development
     volumes:
-      - ./frontend:/app
-      - /app/node_modules
+      - ./frontend:/app:rw        # Code source monté pour hot reload
+      - /app/node_modules         # Éviter l'écrasement des node_modules
     ports:
       - "5174:5174"
     networks:
@@ -45,7 +56,27 @@ services:
     command: npm run dev -- --host 0.0.0.0 --port 5174
     labels:
       - "com.redriva.service=frontend-vue"
+      - "com.redriva.env=development"
 
+  # Redis pour cache et queue
+  redis:
+    image: redis:7-alpine
+    container_name: redriva-redis
+    command: redis-server --appendonly yes
+    volumes:
+      - redriva-redis:/data
+    networks:
+      - redriva-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    labels:
+      - "com.redriva.service=redis"
+
+# Réseaux et volumes
 networks:
   redriva-net:
     driver: bridge
@@ -53,3 +84,4 @@ networks:
 volumes:
   redriva-data:
   redriva-logs:
+  redriva-redis:

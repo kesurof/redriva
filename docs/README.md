@@ -3,8 +3,8 @@
 ## 📚 Index de la Documentation
 
 ### 🚀 Démarrage Rapide
-- [**Installation**](INSTALL.md) - Guide d'installation Docker et manuel
-- [**Utilisation**](USAGE.md) - Guide utilisateur de l'interface web
+- [**Installation**](INSTALL.md) - Guide d'installation automatisée avec Docker
+- [**Utilisation**](USAGE.md) - Guide utilisateur de l'interface web Vue.js
 - [**Déploiement**](DEPLOIEMENT.md) - Déploiement local et production
 
 ### 🏗️ Architecture & Développement  
@@ -13,11 +13,6 @@
 - [**Best Practices**](BEST_PRACTICES.md) - Bonnes pratiques de développement
 - [**Contribution**](CONTRIBUTING.md) - Guide pour contributeurs
 - [**File d'attente**](QUEUE.md) - Système de queue Redis et jobs
-
-### � Archives & Historique
-- [**Migration Completed**](MIGRATION_COMPLETED.md) - Synthèse migration Vue.js terminée
-- [**Real-Debrid Setup**](REAL_DEBRID_SETUP.md) - Configuration authentification
-- [**Troubleshooting**](TROUBLESHOOTING.md) - Résolution des problèmes communs
 
 ---
 
@@ -35,7 +30,6 @@
 ## 🔄 Versions et Changelog
 
 - **v2.0 (juillet 2025)** : Migration Vue.js 3 + Vuetify complète
-- **v1.x** : Version SvelteKit (archivée)
 
 ---
 

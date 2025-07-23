@@ -2,37 +2,67 @@
 # Redriva – Gestionnaire Real-Debrid moderne
 
 Redriva est une application web complète pour gérer, visualiser et automatiser vos torr## Structure du projet
-- `frontend/` : code source Vue.js 3 + Vuetify (UI, composants, vues)
-- `backend/` : code source FastAPI (API, modèles, sécurité)
-- `docs/` : documentation technique, guides, FAQ, déploiement
-- `tests/` : tests unitaires, intégration, E2E
-- `scripts/` : scripts utilitaires, maintenance
-- `config/` : fichiers de configuration et secrets (jamais committer)
-- `logs/` : logs applicatifs persistants
-- `data/` : base de données et données persistantes
-- `systemd/` : fichiers d'unités systemd (déploiement classique)léchargements Real-Debrid, avec une interface moderne, sécurisée et évolutive.
+- `frontend/` : co### 4. Accéder à l'application
+- **Frontend** : [htt## 🚀 Démarrage Rapide
 
-## 🚀 Fonctionnalités principales
+### Développement
+```bash
+# Cloner le projet
+git clone https://github.com/kesurof/redriva.git
+cd redriva
 
-### Interface Utilisateur
-- 📊 **Tableau de bord** : Statistiques en temps réel, filtres avancés, alertes automatiques
-- 📋 **File d'attente intelligente** : Gestion des priorités avec actions groupées et polling automatique
-- 🎯 **Gestion des torrents** : Ajout/suppression, visualisation détaillée, scraper intégré
-- 🌍 **Expérience utilisateur** : Interface responsive, dark mode, internationalisation (i18n)
+# Configurer (optionnel)
+cp .env.example .env
 
-### Sécurité et Production
-- 🔒 **Sécurité avancée** : Tokens sécurisés, rate limiting, logs d'audit complets
-- 📈 **Monitoring** : Métriques Prometheus, surveillance des performances
-- 🔧 **Maintenance** : Scripts d'automatisation, mises à jour sécurisées
-- 🛡️ **Audits** : Vérification automatique des vulnérabilités
+# Démarrer
+./scripts/dev.sh start
 
-### DevOps et Qualité
-- ✅ **Tests complets** : Tests unitaires, intégration, E2E avec Playwright
-- 🔄 **CI/CD** : Workflows GitHub Actions, déploiement automatisé
-- 📚 **Documentation** : Guides complets, API documentée, FAQ
-- 🐳 **Containerisation** : Images Docker optimisées, orchestration
+# Accès
+# Frontend: http://localhost:5174
+# Backend: http://localhost:8080/api
+```
 
-## 📁 Structure du projet
+### Production
+```bash
+# Configurer production
+cp .env.prod.example .env.prod
+# Éditer .env.prod avec vos valeurs
+
+# Déployer
+./scripts/deploy.sh deploy
+
+# Accès: http://localhost:3000
+```
+
+## 🛠️ Commandes Utiles
+
+```bash
+# Développement
+./scripts/dev.sh start      # Démarrer
+./scripts/dev.sh stop       # Arrêter
+./scripts/dev.sh rebuild    # Reconstruire
+./scripts/dev.sh logs       # Voir logs
+./scripts/dev.sh shell      # Accéder au shell
+
+# Production
+./scripts/deploy.sh deploy  # Déployer
+./scripts/deploy.sh stop    # Arrêter
+./scripts/deploy.sh logs    # Voir logs
+./scripts/deploy.sh status  # Statut
+```
+
+## 📁 Architecture Simplifiée
+
+```
+redriva/
+├── backend/           # API FastAPI + Python
+├── frontend/          # Interface Vue.js + Vuetify
+├── scripts/           # Scripts dev/prod
+├── docker-compose.yml # Configuration développement
+└── docker-compose.prod.yml # Configuration production
+```
+
+**Principe fondamental :** Un seul Dockerfile par service, configurations différentes via docker-compose.
 
 ```
 redriva/
@@ -68,16 +98,15 @@ redriva/
 
 ### Validation et déploiement automatique
 ```bash
-# 1. Validation complète du projet
-./scripts/validate.sh
+# 1. Installation automatisée (recommandée)
+git clone https://github.com/kesurof/redriva.git
+cd redriva
+./build-complete.sh
 
-# 2. Déploiement unifié (recommandé)
-./scripts/deploy-unified.sh deploy
-
-# 3. Accès à l'application
-# Frontend: http://localhost:3000
-# API: http://localhost:8000
-# Métriques: http://localhost:8000/metrics
+# 2. Accès à l'application
+# Frontend: http://localhost:5174
+# API: http://localhost:8080
+# Métriques: http://localhost:8080/metrics
 ```
 
 ### Déploiement manuel
@@ -87,7 +116,7 @@ docker compose up -d --build
 
 # Vérification des services
 docker compose ps
-curl http://localhost:8000/health
+curl http://localhost:8080/api/ping
 ```
 
 ## 🔧 Scripts d'Automatisation

@@ -71,7 +71,7 @@ app = FastAPI(title="Redriva API", version="1.0.0")
 # Configuration CORS pour permettre les requêtes depuis le frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  # SvelteKit dev server
+    allow_origins=["http://localhost:5174"],  # Vue.js dev server
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -503,11 +503,11 @@ async def get_services():
             },
             {
                 "name": "Redriva Frontend",
-                "description": "Interface utilisateur web SvelteKit",
+                "description": "Interface utilisateur web Vue.js",
                 "host": docker_host_ip, 
-                "port": 5173,
-                "url": f"http://{docker_host_ip}:5173",
-                "public_url": "http://localhost:5173",
+                "port": 5174,
+                "url": f"http://{docker_host_ip}:5174",
+                "public_url": "http://localhost:5174",
                 "version": "1.0.0",
                 "container_name": "redriva-frontend"
             },
@@ -693,7 +693,7 @@ async def sync_with_real_debrid(background_tasks: BackgroundTasks):
 @app.get("/")
 async def root():
     """Redirection vers le frontend"""
-    return {"message": "Redriva API - Frontend disponible sur port 5173"}
+    return {"message": "Redriva API - Frontend disponible sur port 5174"}
 
 if __name__ == "__main__":
     import uvicorn

@@ -1,33 +1,81 @@
-# Docker Compose pour la production
-# Architecture optimisée avec reverse proxy et services scalables
+# Configuration Docker Compose - Production
+# Approche unifiée "Zéro Réécriture" : même code, configuration optimisée
 
 services:
-  # ===== REVERSE PROXY =====
-  proxy:
-    image: nginx:alpine
-    container_name: redriva-proxy
-    ports:
-      - "0.0.0.0:3000:80"
-      - "0.0.0.0:3443:443"
-    volumes:
-      - ./proxy/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./proxy/conf.d:/etc/nginx/conf.d:ro
-      - redriva-ssl-certs:/etc/nginx/ssl:ro
+  # ===== FRONTEND PRODUCTION (Nginx intégré) =====
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: production          # Utilise le stage production avec Nginx
+    image: redriva/frontend:latest
+    container_name: redriva-frontend
     networks:
       - redriva-frontend
-    depends_on:
-      - frontend
     restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          memory: 128M
+          cpus: '0.25'
     labels:
-      - "com.redriva.service=proxy"
+      - "com.redriva.service=frontend"
+      - "com.redriva.env=production"
 
-  # ===== REDIS (File d'attente) =====
+  # ===== BACKEND API PRODUCTION =====
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile      # MÊME DOCKERFILE que développement !
+    image: redriva/backend:latest
+    container_name: redriva-backend
+    volumes:
+      # Pas de montage de code en production, seulement les données
+      - redriva-data:/app/data
+      - redriva-logs:/app/logs
+    networks:
+      - redriva-backend
+      - redriva-frontend
+    restart: unless-stopped
+    environment:
+      - ENVIRONMENT=production
+      - LOG_LEVEL=INFO
+      - REDIS_URL=redis://redis:6379/0
+    env_file:
+      - .env.prod
+    # Commande production avec workers multiples
+    command: uvicorn app:app --host 0.0.0.0 --port 8000 --workers 4
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    depends_on:
+      redis:
+        condition: service_healthy
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+    labels:
+      - "com.redriva.service=backend"
+      - "com.redriva.env=production"
+
+  # ===== REDIS PRODUCTION =====
   redis:
     image: redis:7-alpine
     container_name: redriva-redis
     command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
     volumes:
-      - redriva-redis-data:/data
+      - redriva-redis:/data
     networks:
       - redriva-backend
     restart: unless-stopped
@@ -38,50 +86,73 @@ services:
       retries: 3
     labels:
       - "com.redriva.service=redis"
+      - "com.redriva.env=production"
 
-  # ===== BACKEND API =====
-  backend:
+  # ===== WORKER BACKGROUND =====
+  worker:
     build:
       context: ./backend
-      dockerfile: Dockerfile.prod
+      dockerfile: Dockerfile      # MÊME DOCKERFILE !
     image: redriva/backend:latest
+    command: ["python", "-m", "arq", "services.queue_service.WorkerSettings"]
     volumes:
       - redriva-data:/app/data
       - redriva-logs:/app/logs
     networks:
       - redriva-backend
-      - redriva-frontend
+    environment:
+      - ENVIRONMENT=production
+      - LOG_LEVEL=INFO
+      - REDIS_URL=redis://redis:6379/0
+    env_file:
+      - .env.prod
     depends_on:
       redis:
         condition: service_healthy
     restart: unless-stopped
-    environment:
-      - ENVIRONMENT=production
-      - REDIS_URL=redis://redis:6379/0
-      - LOG_LEVEL=INFO
-    env_file:
-      - .env.prod
     deploy:
-      replicas: 2
+      replicas: 1
       resources:
         limits:
-          memory: 512M
-          cpus: '0.5'
-        reservations:
           memory: 256M
           cpus: '0.25'
     labels:
-      - "com.redriva.service=backend"
+      - "com.redriva.service=worker"
+      - "com.redriva.env=production"
 
-  # ===== WORKER (Traitement des tâches) =====
-  worker:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile.prod
-    image: redriva/backend:latest
-    command: ["arq", "services.queue_service.WorkerSettings"]
+  # ===== REVERSE PROXY (Nginx externe) =====
+  proxy:
+    image: nginx:alpine
+    container_name: redriva-proxy
+    ports:
+      - "3000:80"
+      - "3443:443"
     volumes:
-      - redriva-data:/app/data
+      - ./proxy/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./proxy/conf.d:/etc/nginx/conf.d:ro
+    networks:
+      - redriva-frontend
+    depends_on:
+      - frontend
+      - backend
+    restart: unless-stopped
+    labels:
+      - "com.redriva.service=proxy"
+      - "com.redriva.env=production"
+
+# Réseaux sécurisés
+networks:
+  redriva-frontend:
+    driver: bridge
+  redriva-backend:
+    driver: bridge
+    internal: true              # Réseau backend isolé
+
+# Volumes persistants
+volumes:
+  redriva-data:
+  redriva-logs:
+  redriva-redis:
       - redriva-logs:/app/logs
     networks:
       - redriva-backend
