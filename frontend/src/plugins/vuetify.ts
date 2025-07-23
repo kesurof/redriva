@@ -112,7 +112,7 @@ const wintryDark: ThemeDefinition = {
     
     // Surfaces mode sombre
     background: '#0F172A',   
-    surface: '#1E293B',      
+    surface: '#1E293B',      // surface-800
     'surface-bright': '#334155',
     'surface-light': '#475569',
     'surface-variant': '#CBD5E1',
@@ -188,6 +188,99 @@ const skeletonDark: ThemeDefinition = {
   }
 }
 
+// Thème Redriva (par défaut)
+const redrivaLight: ThemeDefinition = {
+  dark: false,
+  colors: {
+    // Couleurs principales
+    primary: '#0FBA81',      // Équivalent primary-500 Skeleton
+    secondary: '#4F46E5',    // Équivalent secondary-500 Skeleton
+    tertiary: '#D946EF',     // Équivalent tertiary-500 Skeleton
+    
+    // Statuts
+    success: '#10B981',      // Équivalent success-500
+    warning: '#F59E0B',      // Équivalent warning-500
+    error: '#EF4444',        // Équivalent error-500
+    info: '#3B82F6',         // Équivalent info-500
+    
+    // Surfaces (équivalent surface-* Skeleton)
+    background: '#FFFFFF',   // surface-50
+    surface: '#F8FAFC',      // surface-100
+    'surface-bright': '#FFFFFF',
+    'surface-light': '#EEEEEE',
+    'surface-variant': '#424242',
+    'on-surface-variant': '#EEEEEE',
+    
+    // Couleurs de texte
+    'on-background': '#1E293B',  // surface-900
+    'on-surface': '#334155',     // surface-700
+    'on-primary': '#FFFFFF',
+    'on-secondary': '#FFFFFF',
+    'on-success': '#FFFFFF',
+    'on-warning': '#FFFFFF',
+    'on-error': '#FFFFFF',
+    'on-info': '#FFFFFF',
+    
+    // Couleurs personnalisées Skeleton
+    'surface-50': '#F8FAFC',
+    'surface-100': '#F1F5F9',
+    'surface-200': '#E2E8F0',
+    'surface-300': '#CBD5E1',
+    'surface-400': '#94A3B8',
+    'surface-500': '#64748B',
+    'surface-600': '#475569',
+    'surface-700': '#334155',
+    'surface-800': '#1E293B',
+    'surface-900': '#0F172A'
+  }
+}
+
+const redrivaDark: ThemeDefinition = {
+  dark: true,
+  colors: {
+    // Couleurs principales
+    primary: '#0FBA81',
+    secondary: '#4F46E5',
+    tertiary: '#D946EF',
+    
+    // Statuts
+    success: '#10B981',
+    warning: '#F59E0B',
+    error: '#EF4444',
+    info: '#3B82F6',
+    
+    // Surfaces inversées pour le mode sombre
+    background: '#0F172A',   // surface-900
+    surface: '#1E293B',      // surface-800
+    'surface-bright': '#334155',
+    'surface-light': '#475569',
+    'surface-variant': '#CBD5E1',
+    'on-surface-variant': '#334155',
+    
+    // Couleurs de texte inversées
+    'on-background': '#F8FAFC',
+    'on-surface': '#E2E8F0',
+    'on-primary': '#FFFFFF',
+    'on-secondary': '#FFFFFF',
+    'on-success': '#FFFFFF',
+    'on-warning': '#FFFFFF',
+    'on-error': '#FFFFFF',
+    'on-info': '#FFFFFF',
+    
+    // Couleurs personnalisées inversées
+    'surface-50': '#0F172A',
+    'surface-100': '#1E293B',
+    'surface-200': '#334155',
+    'surface-300': '#475569',
+    'surface-400': '#64748B',
+    'surface-500': '#94A3B8',
+    'surface-600': '#CBD5E1',
+    'surface-700': '#E2E8F0',
+    'surface-800': '#F1F5F9',
+    'surface-900': '#F8FAFC'
+  }
+}
+
 export default createVuetify({
   icons: {
     defaultSet: 'mdi',
@@ -197,37 +290,37 @@ export default createVuetify({
     }
   },
   theme: {
-    defaultTheme: 'skeletonLight',
+    defaultTheme: 'skeletonLight', // Thème par défaut original
     themes: {
       skeletonLight,
       skeletonDark,
       wintryLight,
-      wintryDark
+      wintryDark,
+      redrivaLight,
+      redrivaDark,
     }
   },
   defaults: {
     VCard: {
-      elevation: 2,
+      variant: 'flat',
+      rounded: 'lg'
+    },
+    VSheet: {
+      variant: 'flat',
       rounded: 'lg'
     },
     VBtn: {
-      style: 'text-transform: none;',
+      variant: 'flat',
       rounded: 'lg'
     },
-    VTextField: {
-      variant: 'outlined',
+    VList: {
+      variant: 'flat',
       rounded: 'lg'
     },
-    VSelect: {
-      variant: 'outlined',
-      rounded: 'lg'
-    },
-    VTextarea: {
-      variant: 'outlined',
-      rounded: 'lg'
-    },
-    VChip: {
-      rounded: 'lg'
+    VMenu: {
+      contentProps: {
+        class: 'elevation-4'
+      }
     }
   }
 })

@@ -1,5 +1,5 @@
 <template>
-  <div class="torrent-list">
+  <div class="bg-surface min-vh-100">
     <v-container fluid>
       <!-- En-tête -->
       <v-row>
@@ -145,8 +145,8 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { useDataStore } from '@/stores/data'
-import { useNotificationStore } from '@/stores/notifications'
+import { useDataStore } from '@/composables/useDataStore'
+import { useNotificationStore } from '@/composables/useNotificationStore'
 import TorrentCard from '@/components/TorrentCard.vue'
 
 // Types
@@ -383,9 +383,4 @@ onMounted(() => {
 })
 </script>
 
-<style scoped>
-.torrent-list {
-  min-height: 100vh;
-  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-}
-</style>
+

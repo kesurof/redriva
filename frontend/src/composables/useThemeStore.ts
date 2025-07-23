@@ -2,7 +2,7 @@ import { ref, computed } from 'vue'
 import { useTheme } from 'vuetify'
 
 // Types des thèmes disponibles
-export type ThemeName = 'skeletonLight' | 'skeletonDark' | 'wintryLight' | 'wintryDark'
+export type ThemeName = 'skeletonLight' | 'skeletonDark' | 'wintryLight' | 'wintryDark' | 'redrivaLight' | 'redrivaDark'
 
 // Store global du thème (équivalent au store Svelte)
 const currentTheme = ref<ThemeName>('skeletonLight')
@@ -27,7 +27,7 @@ export function useThemeStore() {
   }
 
   const toggleDarkMode = () => {
-    const baseTheme = currentTheme.value.replace('Light', '').replace('Dark', '') as 'skeleton' | 'wintry'
+    const baseTheme = currentTheme.value.replace('Light', '').replace('Dark', '') as 'skeleton' | 'wintry' | 'redriva'
     const newTheme = isDarkMode.value 
       ? `${baseTheme}Light` as ThemeName
       : `${baseTheme}Dark` as ThemeName
@@ -36,12 +36,12 @@ export function useThemeStore() {
   }
 
   const setLightMode = () => {
-    const baseTheme = currentTheme.value.replace('Light', '').replace('Dark', '') as 'skeleton' | 'wintry'
+    const baseTheme = currentTheme.value.replace('Light', '').replace('Dark', '') as 'skeleton' | 'wintry' | 'redriva'
     setTheme(`${baseTheme}Light` as ThemeName)
   }
 
   const setDarkMode = () => {
-    const baseTheme = currentTheme.value.replace('Light', '').replace('Dark', '') as 'skeleton' | 'wintry'
+    const baseTheme = currentTheme.value.replace('Light', '').replace('Dark', '') as 'skeleton' | 'wintry' | 'redriva'
     setTheme(`${baseTheme}Dark` as ThemeName)
   }
 
@@ -58,7 +58,7 @@ export function useThemeStore() {
   // Initialisation depuis localStorage
   const initTheme = () => {
     const savedTheme = localStorage.getItem('redriva-theme') as ThemeName | null
-    if (savedTheme && ['skeletonLight', 'skeletonDark', 'wintryLight', 'wintryDark'].includes(savedTheme)) {
+    if (savedTheme && ['skeletonLight', 'skeletonDark', 'wintryLight', 'wintryDark', 'redrivaLight', 'redrivaDark'].includes(savedTheme)) {
       setTheme(savedTheme)
     } else {
       // Détecter préférence système

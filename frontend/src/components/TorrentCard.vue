@@ -1,5 +1,11 @@
 <template>
-  <v-card class="torrent-card" hover>
+  <v-card 
+    elevation="2" 
+    rounded="lg"
+    class="elevation-hover"
+    style="transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)"
+    hover
+  >
     <!-- En-tête avec nom, statut et priorité -->
     <v-card-title class="pb-2">
       <div class="d-flex align-start justify-space-between w-100">
@@ -260,12 +266,4 @@ const handleOpen = () => emit('open', props.id)
 const handleDelete = () => emit('delete', props.id)
 </script>
 
-<style scoped>
-.torrent-card {
-  transition: all 0.2s ease-in-out;
-}
 
-.torrent-card:hover {
-  transform: translateY(-2px);
-}
-</style>

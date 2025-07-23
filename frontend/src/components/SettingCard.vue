@@ -1,5 +1,8 @@
 <template>
-  <v-card class="setting-card">
+  <v-card 
+    class="elevation-hover"
+    style="transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1)"
+  >
     <v-card-text class="pa-6">
       <div class="d-flex align-start" style="gap: 16px;">
         <!-- Icône -->
@@ -231,13 +234,4 @@ const handleChange = (newValue: any) => {
 }
 </script>
 
-<style scoped>
-.setting-card {
-  transition: all 0.2s ease-in-out;
-}
 
-.setting-card:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-}
-</style>

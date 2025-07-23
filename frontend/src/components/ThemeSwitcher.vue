@@ -1,5 +1,5 @@
 <template>
-  <div class="theme-switcher">
+  <div class="d-flex align-center" style="gap: 0.5rem">
     <!-- Toggle Dark/Light -->
     <v-btn
       :icon="isDark ? 'mdi-weather-sunny' : 'mdi-weather-night'"
@@ -62,6 +62,18 @@ const themes = computed(() => [
     color: 'primary'
   },
   {
+    name: 'redrivaLight' as ThemeName,
+    label: 'Redriva Clair',
+    icon: 'mdi-weather-sunny',
+    color: 'primary'
+  },
+  {
+    name: 'redrivaDark' as ThemeName,
+    label: 'Redriva Sombre',
+    icon: 'mdi-weather-night',
+    color: 'primary'
+  },
+  {
     name: 'wintryLight' as ThemeName,
     label: 'Wintry Clair',
     icon: 'mdi-snowflake',
@@ -76,10 +88,4 @@ const themes = computed(() => [
 ])
 </script>
 
-<style scoped>
-.theme-switcher {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-</style>
+

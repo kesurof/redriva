@@ -68,6 +68,32 @@ case "${1:-start}" in
         log "✅ Reconstruction terminée"
         ;;
     
+    "clear-cache")
+        service=${2:-backend}
+        log "🧹 Effacement du cache Docker pour: $service"
+        warn "⚠️  Reconstruction sans cache - peut prendre plus de temps"
+        echo ""
+        log "🛑 Arrêt des services..."
+        docker compose down
+        
+        if [ "$service" = "all" ]; then
+            log "🔨 Reconstruction sans cache de TOUS les services..."
+            docker compose build --no-cache
+        else
+            log "🔨 Reconstruction sans cache de $service..."
+            docker compose build --no-cache "$service"
+        fi
+        
+        log "🚀 Redémarrage des services..."
+        docker compose up -d
+        log "✅ Effacement du cache terminé"
+        echo ""
+        info "💡 Utilisation:"
+        info "   $0 clear-cache           # Efface le cache du backend"
+        info "   $0 clear-cache frontend  # Efface le cache du frontend"
+        info "   $0 clear-cache all       # Efface le cache de tous les services"
+        ;;
+    
     "logs")
         service=${2:-}
         if [ -n "$service" ]; then
@@ -143,21 +169,27 @@ case "${1:-start}" in
         ;;
     
     *)
-        echo -e "${YELLOW}Usage: $0 {start|stop|rebuild|logs [service]|shell [service]|status|deps-frontend <package>|deps-backend|reset}${NC}"
+        echo -e "${YELLOW}Usage: $0 {start|stop|rebuild|clear-cache [service]|logs [service]|shell [service]|status|deps-frontend <package>|deps-backend|reset}${NC}"
         echo ""
         echo "Commandes principales:"
-        echo "  start          Démarrer l'environnement"
-        echo "  stop           Arrêter l'environnement"
-        echo "  rebuild        Reconstruire complètement"
-        echo "  status         Statut des services"
+        echo "  start               Démarrer l'environnement"
+        echo "  stop                Arrêter l'environnement"
+        echo "  rebuild             Reconstruire complètement"
+        echo "  clear-cache [svc]   Effacer le cache Docker (backend par défaut)"
+        echo "  status              Statut des services"
         echo ""
         echo "Debug et maintenance:"
-        echo "  logs [service] Voir les logs"
-        echo "  shell [service] Accéder au shell"
-        echo "  reset          Reset complet (dangereux)"
+        echo "  logs [service]      Voir les logs"
+        echo "  shell [service]     Accéder au shell"
+        echo "  reset               Reset complet (dangereux)"
         echo ""
         echo "Gestion des dépendances:"
-        echo "  deps-frontend <pkg>  Ajouter un paquet npm"
-        echo "  deps-backend         Instructions pour backend"
+        echo "  deps-frontend <pkg> Ajouter un paquet npm"
+        echo "  deps-backend        Instructions pour backend"
+        echo ""
+        echo "Exemples clear-cache:"
+        echo "  $0 clear-cache           # Cache backend uniquement"
+        echo "  $0 clear-cache frontend  # Cache frontend uniquement"
+        echo "  $0 clear-cache all       # Cache de tous les services"
         ;;
 esac

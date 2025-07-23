@@ -56,12 +56,14 @@ cp .env.prod.example .env.prod
 
 ### Développement
 ```bash
-./scripts/dev.sh start      # 🚀 Démarrer l'environnement
-./scripts/dev.sh stop       # ⏹️  Arrêter l'environnement
-./scripts/dev.sh logs       # 📋 Voir les logs en temps réel
-./scripts/dev.sh shell      # 🐚 Accéder au shell backend
-./scripts/dev.sh test       # 🧪 Lancer tous les tests
-./scripts/dev.sh rebuild    # 🔄 Reconstruire complètement
+./scripts/dev.sh start            # 🚀 Démarrer l'environnement
+./scripts/dev.sh stop             # ⏹️  Arrêter l'environnement
+./scripts/dev.sh logs             # 📋 Voir les logs en temps réel
+./scripts/dev.sh shell            # 🐚 Accéder au shell backend
+./scripts/dev.sh test             # 🧪 Lancer tous les tests
+./scripts/dev.sh rebuild          # 🔄 Reconstruire complètement
+./scripts/dev.sh clear-cache      # 🧹 Effacer le cache Docker (backend)
+./scripts/dev.sh clear-cache all  # 🧹 Effacer le cache de tous les services
 ```
 
 ### Production
@@ -178,12 +180,24 @@ python -m pytest
 ./scripts/dev.sh rebuild
 ```
 
+**Variables d'environnement modifiées (tokens, configuration) :**
+```bash
+# Effacer le cache pour prendre en compte les nouveaux tokens
+./scripts/dev.sh clear-cache backend
+```
+
 **Erreurs de dépendances :**
 ```bash
 ./scripts/dev.sh shell frontend
 npm install
-# Puis reconstruire
-docker compose build frontend
+# Puis reconstruire sans cache
+./scripts/dev.sh clear-cache frontend
+```
+
+**Cache Docker corrompu :**
+```bash
+# Effacer tous les caches et reconstruire
+./scripts/dev.sh clear-cache all
 ```
 
 **Base de données corrompue :**
@@ -227,7 +241,9 @@ rm -rf frontend/node_modules
 | **[Installation](docs/INSTALL.md)** | Guide d'installation détaillé |
 | **[Architecture](docs/ARCHITECTURE.md)** | Architecture technique complète |
 | **[Guide de Développement](docs/AI_DEVELOPMENT_GUIDE.md)** | Standards et bonnes pratiques |
+| **[Instructions IA](docs/AI_INSTRUCTIONS.md)** | Instructions complètes pour assistant IA |
 | **[Déploiement](docs/DEPLOIEMENT.md)** | Procédures de déploiement |
+| **[Clear Cache](scripts/CLEAR_CACHE.md)** | Guide de la fonction clear-cache |
 | **[Contribution](docs/CONTRIBUTING.md)** | Guide de contribution |
 | **[API](docs/USAGE.md)** | Documentation de l'API |
 

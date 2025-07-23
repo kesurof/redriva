@@ -1,8 +1,9 @@
 <template>
   <v-card
-    :class="cardClasses"
+    :class="[cardClasses, 'elevation-hover']"
     :variant="cardVariant"
     :color="cardColor"
+    style="transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1)"
   >
     <v-card-text :class="paddingClass">
       <div class="d-flex align-center justify-space-between">
@@ -10,7 +11,7 @@
           <!-- Titre -->
           <h3 
             :class="titleClasses"
-            class="text-uppercase tracking-wide text-medium-emphasis"
+            class="text-uppercase text-medium-emphasis"
           >
             {{ title }}
           </h3>
@@ -262,16 +263,4 @@ const clampedProgress = computed(() => {
 })
 </script>
 
-<style scoped>
-.stat-card {
-  transition: all 0.2s ease-in-out;
-}
 
-.stat-card:hover {
-  transform: translateY(-2px);
-}
-
-.tracking-wide {
-  letter-spacing: 0.025em;
-}
-</style>

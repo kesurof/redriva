@@ -166,6 +166,65 @@ docker compose run --rm frontend npm install <nom-du-paquet>
 docker compose build frontend
 ```
 
+### 🧹 Fonction Clear-Cache (NOUVELLE - Juillet 2025)
+
+**Fonction essentielle** pour effacer le cache Docker et reconstruire sans cache. Particulièrement utile pour :
+- Changements de variables d'environnement (tokens Real-Debrid)
+- Problèmes de cache Docker corrompus
+- Modifications de configuration
+
+#### Syntaxe et Options
+
+```bash
+# Effacer le cache du backend (défaut)
+./scripts/dev.sh clear-cache
+
+# Effacer le cache du frontend
+./scripts/dev.sh clear-cache frontend
+
+# Effacer le cache de tous les services
+./scripts/dev.sh clear-cache all
+```
+
+#### Équivalences Docker
+
+| Commande Clear-Cache | Équivalent Docker Compose |
+|---------------------|---------------------------|
+| `clear-cache` | `docker compose down && docker compose build --no-cache backend && docker compose up -d` |
+| `clear-cache frontend` | `docker compose down && docker compose build --no-cache frontend && docker compose up -d` |
+| `clear-cache all` | `docker compose down && docker compose build --no-cache && docker compose up -d` |
+
+#### Cas d'Usage Principaux
+
+**1. Token Real-Debrid modifié :**
+```bash
+# 1. Modifier le token dans .env
+echo "REALDEBRID_API_TOKEN=nouveau_token" >> .env
+
+# 2. Reconstruire sans cache pour prendre en compte
+./scripts/dev.sh clear-cache backend
+
+# 3. Vérifier l'authentification
+curl -s http://localhost:8080/api/auth/status | jq
+```
+
+**2. Problèmes de dépendances :**
+```bash
+# Après modification package.json ou requirements.txt
+./scripts/dev.sh clear-cache frontend  # ou backend
+
+# Vérification
+./scripts/dev.sh status
+```
+
+**3. Cache Docker corrompu :**
+```bash
+# Quand des erreurs étranges persistent
+./scripts/dev.sh clear-cache all
+```
+
+**⚠️ Attention :** Cette opération prend plus de temps (20-30s par service) car elle télécharge toutes les dépendances.
+
 ### Procédure de Développement d'une Page
 
 **Toujours suivre cette séquence :**
@@ -240,6 +299,328 @@ async def get_data() -> Dict[str, Any]:
         raise HTTPException(status_code=500, detail=str(e))
 ```
 
+### 🎨 Bonnes Pratiques Vuetify (OBLIGATOIRES)
+
+#### Principe Fondamental
+**INTERDICTION ABSOLUE d'utiliser du CSS custom** - Utiliser UNIQUEMENT les ressources natives Vuetify pour respecter la philosophie "Zéro Réécriture".
+
+#### 1. Classes Utilitaires Vuetify (Remplacent le CSS)
+
+```vue
+<!-- ✅ CORRECT - Classes Vuetify natives -->
+<template>
+  <v-card 
+    elevation="3"
+    class="ma-4 pa-6 rounded-lg"
+  >
+    <v-card-title class="d-flex justify-space-between align-center pb-4">
+      <h3 class="text-h6 font-weight-bold">{{ title }}</h3>
+      <v-chip 
+        color="success" 
+        variant="tonal" 
+        size="small"
+        class="text-uppercase"
+      >
+        En ligne
+      </v-chip>
+    </v-card-title>
+    
+    <v-card-text class="px-6 py-0">
+      <v-row dense>
+        <v-col cols="12" sm="6" md="4">
+          <!-- Contenu responsive -->
+        </v-col>
+      </v-row>
+    </v-card-text>
+    
+    <v-card-actions class="px-6 pt-4">
+      <v-spacer />
+      <v-btn-group variant="outlined" divided density="comfortable">
+        <v-btn color="primary" prepend-icon="mdi-open-in-new">
+          Ouvrir
+        </v-btn>
+        <v-btn color="warning" prepend-icon="mdi-restart">
+          Redémarrer
+        </v-btn>
+      </v-btn-group>
+    </v-card-actions>
+  </v-card>
+</template>
+
+<!-- ❌ INTERDIT - CSS custom -->
+<style scoped>
+.custom-card {
+  margin: 16px;
+  padding: 24px;
+  /* PAS DE CSS CUSTOM ! */
+}
+</style>
+```
+
+#### 2. Système de Thèmes Vuetify
+
+```javascript
+// plugins/vuetify.ts - Configuration des thèmes
+import { createVuetify } from 'vuetify'
+
+const customThemes = {
+  redrivaLight: {
+    dark: false,
+    colors: {
+      primary: '#1976D2',
+      secondary: '#424242',
+      success: '#4CAF50',
+      warning: '#FF9800',
+      error: '#FF5252',
+      info: '#2196F3',
+      surface: '#FFFFFF',
+      background: '#F5F5F5'
+    }
+  },
+  redrivaDark: {
+    dark: true,
+    colors: {
+      primary: '#2196F3',
+      secondary: '#616161',
+      success: '#4CAF50',
+      warning: '#FF9800',
+      error: '#FF5252',
+      info: '#2196F3',
+      surface: '#121212',
+      background: '#0D1117'
+    }
+  }
+}
+
+export default createVuetify({
+  theme: {
+    defaultTheme: 'redrivaLight',
+    themes: customThemes
+  },
+  defaults: {
+    VCard: { elevation: 2, rounded: 'lg' },
+    VBtn: { rounded: 'lg', elevation: 1 },
+    VChip: { rounded: 'lg' }
+  }
+})
+```
+
+#### 3. Composant ThemeSwitcher Moderne
+
+```vue
+<!-- components/ThemeSwitcher.vue -->
+<template>
+  <v-menu offset-y>
+    <template #activator="{ props }">
+      <v-btn v-bind="props" icon variant="text" size="large">
+        <v-icon>{{ themeIcon }}</v-icon>
+      </v-btn>
+    </template>
+
+    <v-card min-width="280" elevation="8">
+      <v-card-title class="pa-4">
+        <v-icon start>mdi-palette</v-icon>
+        Apparence
+      </v-card-title>
+      <v-divider />
+      <v-list density="comfortable">
+        <v-list-item
+          v-for="theme in availableThemes"
+          :key="theme.value"
+          :active="currentTheme === theme.value"
+          @click="setTheme(theme.value)"
+        >
+          <template #prepend>
+            <v-avatar :color="theme.primaryColor" size="24" class="mr-3">
+              <v-icon color="white" size="small">{{ theme.icon }}</v-icon>
+            </v-avatar>
+          </template>
+          <v-list-item-title>{{ theme.name }}</v-list-item-title>
+          <v-list-item-subtitle>{{ theme.description }}</v-list-item-subtitle>
+          <template #append>
+            <v-icon v-if="currentTheme === theme.value" color="success">
+              mdi-check
+            </v-icon>
+          </template>
+        </v-list-item>
+      </v-list>
+    </v-card>
+  </v-menu>
+</template>
+```
+
+#### 4. Classes d'Espacement et Positionnement
+
+```vue
+<!-- Système d'espacement Vuetify (remplace margin/padding CSS) -->
+<div class="ma-4">        <!-- margin: 16px (all) -->
+<div class="pa-6">        <!-- padding: 24px (all) -->
+<div class="mx-2 my-3">   <!-- margin-x: 8px, margin-y: 12px -->
+<div class="pt-4 pb-2">   <!-- padding-top: 16px, padding-bottom: 8px -->
+
+<!-- Flexbox et Grid Vuetify -->
+<div class="d-flex justify-space-between align-center">
+<div class="d-flex flex-column gap-4">
+<div class="text-center">
+<div class="w-100 h-100">
+
+<!-- Responsive -->
+<v-col cols="12" sm="6" md="4" lg="3">
+<div class="d-none d-sm-flex">     <!-- Hidden on mobile -->
+<div class="d-flex d-md-none">     <!-- Hidden on desktop -->
+```
+
+#### 5. Composants Modernes à Privilégier
+
+```vue
+<!-- ✅ Boutons d'Action Modernes -->
+<v-btn-group variant="outlined" divided density="comfortable">
+  <v-btn color="primary" prepend-icon="mdi-open-in-new">Ouvrir</v-btn>
+  <v-btn color="warning" prepend-icon="mdi-restart">Redémarrer</v-btn>
+</v-btn-group>
+
+<!-- ✅ FAB (Floating Action Button) -->
+<v-btn 
+  icon="mdi-plus" 
+  color="primary" 
+  elevation="6"
+  size="large"
+  class="fab-fixed"
+/>
+
+<!-- ✅ Indicateurs de Statut -->
+<v-chip 
+  :color="statusColor" 
+  variant="tonal" 
+  prepend-icon="mdi-circle"
+  size="small"
+>
+  {{ statusText }}
+</v-chip>
+
+<!-- ✅ Cartes avec Actions -->
+<v-card elevation="3" class="rounded-lg">
+  <v-card-title class="d-flex justify-space-between align-center">
+    <span>Titre</span>
+    <v-menu>
+      <template #activator="{ props }">
+        <v-btn v-bind="props" icon="mdi-dots-vertical" variant="text" />
+      </template>
+      <v-list>
+        <v-list-item @click="action1">Action 1</v-list-item>
+        <v-list-item @click="action2">Action 2</v-list-item>
+      </v-list>
+    </v-menu>
+  </v-card-title>
+</v-card>
+
+<!-- ✅ Formulaires avec Validation -->
+<v-form ref="form" v-model="valid">
+  <v-text-field
+    v-model="name"
+    label="Nom"
+    :rules="nameRules"
+    variant="outlined"
+    density="comfortable"
+  />
+  <v-btn 
+    :disabled="!valid" 
+    color="primary" 
+    @click="submit"
+  >
+    Valider
+  </v-btn>
+</v-form>
+```
+
+#### 6. Variables de Thème et Couleurs
+
+```vue
+<!-- Utilisation des variables de thème Vuetify -->
+<template>
+  <div 
+    class="bg-primary text-on-primary pa-4"
+    style="background: rgb(var(--v-theme-surface-variant))"
+  >
+    <!-- Contenu avec couleurs de thème -->
+  </div>
+</template>
+
+<!-- Classes de couleur Vuetify -->
+<div class="text-primary bg-surface">
+<div class="text-success bg-success-lighten-4">
+<div class="text-error bg-error-darken-2">
+```
+
+#### 7. Animations et Transitions Vuetify
+
+```vue
+<!-- ✅ Transitions natives Vuetify -->
+<v-expand-transition>
+  <div v-show="show">Contenu qui s'expanse</div>
+</v-expand-transition>
+
+<v-fade-transition>
+  <div v-show="show">Contenu qui apparaît en fade</div>
+</v-fade-transition>
+
+<v-scale-transition>
+  <div v-show="show">Contenu avec effet d'échelle</div>
+</v-scale-transition>
+
+<!-- ✅ Hover effects avec classes -->
+<v-card 
+  class="elevation-hover"
+  style="transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)"
+  @mouseenter="elevation = 8"
+  @mouseleave="elevation = 2"
+>
+```
+
+#### ⚠️ Interdictions Absolues
+
+```vue
+<!-- ❌ NE JAMAIS FAIRE -->
+<style scoped>
+.custom-button {
+  background: #1976D2;
+  padding: 12px 24px;
+  border-radius: 8px;
+}
+</style>
+
+<!-- ❌ NE JAMAIS FAIRE -->
+<div style="margin: 16px; padding: 24px;">
+
+<!-- ❌ NE JAMAIS FAIRE -->
+<div class="custom-grid">
+  <!-- Layout custom au lieu de v-row/v-col -->
+</div>
+```
+
+#### ✅ Remplacement Vuetify Correct
+
+```vue
+<!-- ✅ TOUJOURS FAIRE -->
+<v-btn 
+  color="primary" 
+  class="px-6 py-3 rounded-lg"
+  elevation="2"
+>
+  Bouton Moderne
+</v-btn>
+
+<!-- ✅ TOUJOURS FAIRE -->
+<div class="ma-4 pa-6">
+
+<!-- ✅ TOUJOURS FAIRE -->
+<v-row>
+  <v-col cols="12" sm="6" md="4">
+    <!-- Layout responsive Vuetify -->
+  </v-col>
+</v-row>
+```
+
 ---
 
 ## 🔄 Communication Frontend ↔ Backend
@@ -302,7 +683,11 @@ Voici les pages actuellement disponibles dans l'application :
 
 ### ❌ Ne JAMAIS faire :
 - Exécuter `npm install` directement sur la machine locale
+- **Écrire du CSS custom** (utiliser UNIQUEMENT les classes Vuetify natives)
+- **Utiliser des styles inline** (`style="margin: 16px"` → `class="ma-4"`)
 - Utiliser Skeleton UI ou Tailwind CSS (utiliser UNIQUEMENT Vuetify)
+- **Créer des composants stylés manuellement** (utiliser les composants Vuetify natifs)
+- **Ignorer le système de thème Vuetify** (utiliser les variables de thème)
 - Mélanger les approches state management (utiliser UNIQUEMENT les composables Vue)
 - Créer des endpoints qui retournent du HTML (API doit être JSON pur)
 - Modifier les fichiers de configuration production sans tester
@@ -312,6 +697,10 @@ Voici les pages actuellement disponibles dans l'application :
 
 ### ✅ Toujours faire :
 - Utiliser Docker pour toutes les opérations
+- **Utiliser EXCLUSIVEMENT les classes utilitaires Vuetify** (`ma-4`, `pa-6`, `d-flex`, etc.)
+- **Privilégier les composants Vuetify natifs** (`v-btn-group`, `v-chip`, `v-menu`, etc.)
+- **Respecter le système de thème Vuetify** (couleurs, élévations, bordures)
+- **Utiliser les transitions Vuetify natives** (`v-fade-transition`, `v-scale-transition`)
 - Privilégier les scripts simplifiés (`./scripts/dev.sh`, `./scripts/deploy.sh`)
 - Suivre la philosophie "Zéro Réécriture"
 - Respecter la structure des dossiers unifiée
@@ -328,20 +717,22 @@ Voici les pages actuellement disponibles dans l'application :
 
 #### Développement
 ```bash
-./scripts/dev.sh start          # Démarrer l'environnement
-./scripts/dev.sh stop           # Arrêter l'environnement
-./scripts/dev.sh restart        # Redémarrer l'environnement
-./scripts/dev.sh rebuild        # Reconstruire les images et redémarrer
-./scripts/dev.sh status         # Voir l'état des services
-./scripts/dev.sh logs           # Afficher tous les logs
-./scripts/dev.sh logs backend   # Logs du backend uniquement
-./scripts/dev.sh logs frontend  # Logs du frontend uniquement
-./scripts/dev.sh shell          # Shell dans le backend
-./scripts/dev.sh shell frontend # Shell dans le frontend
-./scripts/dev.sh monitor        # Monitoring en temps réel
-./scripts/dev.sh test           # Lancer tous les tests
-./scripts/dev.sh lint           # Vérifier la qualité du code
-./scripts/dev.sh db:reset       # Remettre à zéro la base de données
+./scripts/dev.sh start            # Démarrer l'environnement
+./scripts/dev.sh stop             # Arrêter l'environnement
+./scripts/dev.sh restart          # Redémarrer l'environnement
+./scripts/dev.sh rebuild          # Reconstruire les images et redémarrer
+./scripts/dev.sh clear-cache      # Effacer le cache Docker (backend)
+./scripts/dev.sh clear-cache all  # Effacer le cache de tous les services
+./scripts/dev.sh status           # Voir l'état des services
+./scripts/dev.sh logs             # Afficher tous les logs
+./scripts/dev.sh logs backend     # Logs du backend uniquement
+./scripts/dev.sh logs frontend    # Logs du frontend uniquement
+./scripts/dev.sh shell            # Shell dans le backend
+./scripts/dev.sh shell frontend   # Shell dans le frontend
+./scripts/dev.sh monitor          # Monitoring en temps réel
+./scripts/dev.sh test             # Lancer tous les tests
+./scripts/dev.sh lint             # Vérifier la qualité du code
+./scripts/dev.sh db:reset         # Remettre à zéro la base de données
 ```
 
 #### Production
@@ -414,12 +805,14 @@ docker compose exec backend python -m pytest
 ## 🎯 Objectifs Prioritaires pour l'Assistant
 
 1. **Respecter la philosophie "Zéro Réécriture"** dans toutes les suggestions
-2. **Utiliser UNIQUEMENT Vuetify** pour l'interface utilisateur
-3. **Maintenir la compatibilité Docker** pour tous les changements
-4. **Privilégier les scripts simplifiés** (`./scripts/dev.sh`, `./scripts/deploy.sh`)
-5. **Tester immédiatement** toute modification proposée
-6. **Documenter** les changements importants
-7. **Préparer le terrain** pour les images Docker de production optimisées
+2. **Utiliser UNIQUEMENT les ressources natives Vuetify** (classes, composants, thèmes)
+3. **INTERDIRE ABSOLUMENT le CSS custom** - Remplacer par les classes Vuetify
+4. **Maintenir la compatibilité Docker** pour tous les changements
+5. **Privilégier les scripts simplifiés** (`./scripts/dev.sh`, `./scripts/deploy.sh`)
+6. **Utiliser le système de thèmes Vuetify** pour la personnalisation
+7. **Tester immédiatement** toute modification proposée
+8. **Documenter** les changements importants
+9. **Préparer le terrain** pour les images Docker de production optimisées
 
 ### 🔄 Workflow Recommandé pour l'Assistant
 

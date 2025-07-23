@@ -77,10 +77,19 @@
           lg="4"
         >
           <ServiceCard
-            :service="service"
-            @restart="handleRestart"
-            @stop="handleStop"
+            :name="service.name"
+            :description="service.description"
+            :status="service.status"
+            :url="service.url"
+            :version="service.version"
+            :port="service.port"
+            :category="service.category || 'system'"
+            :display-name="service.displayName"
             @start="handleStart"
+            @stop="handleStop"
+            @restart="handleRestart"
+            @view-logs="handleViewLogs"
+            @view-config="handleViewConfig"
           />
         </v-col>
       </v-row>
@@ -115,8 +124,8 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { useAppStore } from '@/stores/app'
-import { useNotificationStore } from '@/stores/notifications'
+import { useAppStore } from '@/composables/useAppStore'
+import { useNotificationStore } from '@/composables/useNotificationStore'
 import StatCard from '@/components/StatCard.vue'
 import ServiceCard from '@/components/ServiceCard.vue'
 
@@ -278,6 +287,26 @@ const handleStart = (serviceName: string) => {
   if (service) {
     service.status = 'running'
   }
+}
+
+const handleViewLogs = (serviceName: string) => {
+  console.log(`Voir les logs du service ${serviceName}`)
+  // TODO: Naviguer vers la page des logs ou ouvrir un modal
+  notificationStore.add({
+    type: 'info',
+    title: 'Logs du service',
+    message: `Ouverture des logs pour ${serviceName}`
+  })
+}
+
+const handleViewConfig = (serviceName: string) => {
+  console.log(`Voir la configuration du service ${serviceName}`)
+  // TODO: Naviguer vers la page de configuration
+  notificationStore.add({
+    type: 'info',
+    title: 'Configuration',
+    message: `Ouverture de la configuration pour ${serviceName}`
+  })
 }
 
 // Lifecycle

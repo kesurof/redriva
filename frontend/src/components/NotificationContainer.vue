@@ -8,6 +8,7 @@
     location="top right"
     variant="elevated"
     multi-line
+    class="mb-2"
     @update:model-value="handleClose(notification.id, $event)"
   >
     <div class="d-flex align-center">
@@ -88,8 +89,4 @@ const handleClose = (id: string, isOpen: boolean) => {
 }
 </script>
 
-<style scoped>
-.v-snackbar {
-  margin-bottom: 8px;
-}
-</style>
+

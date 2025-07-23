@@ -261,7 +261,7 @@
 
 <script setup lang="ts">
 import { ref, reactive } from 'vue'
-import { useNotificationStore } from '@/stores/notifications'
+import { useNotificationStore } from '@/composables/useNotificationStore'
 
 // Stores
 const notificationStore = useNotificationStore()

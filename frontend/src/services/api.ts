@@ -24,10 +24,38 @@ export interface QueueItem {
 }
 
 export interface SystemInfo {
-	cpu_usage: number;
-	memory_usage: number;
-	disk_usage: number;
+	cpu_percent: number;
+	memory: {
+		used: number;
+		total: number;
+		available: number;
+	};
+	disk: {
+		used: number;
+		total: number;
+		free: number;
+	};
 	uptime: string;
+	load_average: number[];
+	boot_time: string;
+	network: {
+		bytes_sent: number;
+		bytes_recv: number;
+	};
+}
+
+export interface Service {
+	name: string;
+	status: 'online' | 'offline';
+	description: string;
+	url: string;
+	version: string;
+	lastCheck: string;
+	responseTime: number | null;
+	uptime: string | null;
+	cpu_usage: number | null;
+	memory_usage: number | null;
+	port: number;
 }
 
 export interface ApiResponse<T> {
@@ -117,6 +145,10 @@ class ApiClient {
 	// System
 	async getSystemInfo(): Promise<ApiResponse<SystemInfo>> {
 		return this.request<SystemInfo>('/system');
+	}
+
+	async getServices(): Promise<ApiResponse<Service[]>> {
+		return this.request<Service[]>('/services');
 	}
 
 	async getLogs(): Promise<ApiResponse<string[]>> {
