@@ -1,7 +1,16 @@
 
 # Redriva – Gestionnaire Real-Debrid moderne
 
-Redriva est une application web complète pour gérer, visualiser et automatiser vos torrents et téléchargements Real-Debrid, avec une interface moderne, sécurisée et évolutive.
+Redriva est une application web complète pour gérer, visualiser et automatiser vos torr## Structure du projet
+- `frontend/` : code source Vue.js 3 + Vuetify (UI, composants, vues)
+- `backend/` : code source FastAPI (API, modèles, sécurité)
+- `docs/` : documentation technique, guides, FAQ, déploiement
+- `tests/` : tests unitaires, intégration, E2E
+- `scripts/` : scripts utilitaires, maintenance
+- `config/` : fichiers de configuration et secrets (jamais committer)
+- `logs/` : logs applicatifs persistants
+- `data/` : base de données et données persistantes
+- `systemd/` : fichiers d'unités systemd (déploiement classique)léchargements Real-Debrid, avec une interface moderne, sécurisée et évolutive.
 
 ## 🚀 Fonctionnalités principales
 
@@ -27,11 +36,12 @@ Redriva est une application web complète pour gérer, visualiser et automatiser
 
 ```
 redriva/
-├── frontend/               # Application SvelteKit (UI moderne)
+├── frontend/               # Application Vue.js 3 + Vuetify (UI moderne)
 │   ├── src/
-│   │   ├── lib/           # Composants réutilisables
-│   │   ├── routes/        # Pages et API routes
-│   │   └── app.html       # Template principal
+│   │   ├── components/    # Composants réutilisables
+│   │   ├── views/         # Pages et vues
+│   │   ├── composables/   # Stores et logique réactive
+│   │   └── main.ts        # Point d'entrée principal
 │   ├── Dockerfile         # Image de production
 │   └── nginx.conf.template # Configuration Nginx sécurisée
 ├── backend/               # API FastAPI (serveur robuste)

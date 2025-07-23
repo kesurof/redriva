@@ -1,51 +1,41 @@
-# Dockerfile de production pour le Frontend
-# Construction multi-étapes pour optimiser la taille de l'image finale
-
-# ===== ÉTAPE 1: Construction =====
+# Build stage
 FROM node:20-alpine AS builder
 
-# Variables d'environnement pour la construction
-ENV NODE_ENV=production
-ENV VITE_API_URL=/api
-
-# Répertoire de travail
 WORKDIR /app
 
 # Copier les fichiers de dépendances
 COPY package*.json ./
-
-# Installer les dépendances (production + dev pour la construction)
-RUN npm ci --include=dev
+RUN npm ci --only=production && npm ci
 
 # Copier le code source
 COPY . .
 
-# Construire l'application
+# Build de l'application
 RUN npm run build
 
-# ===== ÉTAPE 2: Image de production =====
+# Production stage
 FROM nginx:alpine AS production
 
-# Installer gettext pour envsubst (substitution de variables)
-RUN apk add --no-cache gettext
-
-# Copier les fichiers construits depuis l'étape builder
-COPY --from=builder /app/build /usr/share/nginx/html
-
-# Copier la configuration Nginx personnalisée
+# Copier la configuration Nginx
 COPY nginx.conf.template /etc/nginx/templates/default.conf.template
 
-# Variables d'environnement par défaut
-ENV API_BACKEND_URL=http://backend:8000
-ENV NGINX_PORT=3000
+# Copier les fichiers construits
+COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Exposer le port
+# Créer un utilisateur non-root
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S vue -u 1001 -G nodejs
+
+# Changer les permissions
+RUN chown -R vue:nodejs /usr/share/nginx/html && \
+    chown -R vue:nodejs /var/cache/nginx && \
+    chown -R vue:nodejs /var/log/nginx && \
+    chown -R vue:nodejs /etc/nginx/conf.d && \
+    touch /var/run/nginx.pid && \
+    chown -R vue:nodejs /var/run/nginx.pid
+
+USER vue
+
 EXPOSE 3000
 
-# Démarrage avec substitution des variables d'environnement
 CMD ["nginx", "-g", "daemon off;"]
-
-# Métadonnées
-LABEL maintainer="redriva@example.com"
-LABEL version="1.0.0"
-LABEL description="Redriva Frontend - Production Image"

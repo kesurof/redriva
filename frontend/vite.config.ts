@@ -1,62 +1,52 @@
-import { sveltekit } from '@sveltejs/kit/vite';
-import { defineConfig } from 'vite';
-import path from 'path';
+import { defineConfig } from 'vite'
+import vue from '@vitejs/plugin-vue'
+import vuetify from 'vite-plugin-vuetify'
+import { fileURLToPath, URL } from 'node:url'
 
 export default defineConfig({
-	plugins: [
-		sveltekit()
-	],
-	resolve: {
-		alias: {
-			$components: path.resolve('./src/lib/components'),
-			$stores: path.resolve('./src/lib/stores'),
-			$types: path.resolve('./src/lib/types'),
-			$utils: path.resolve('./src/lib/utils'),
-			$api: path.resolve('./src/lib/api.ts')
-		}
-	},
-	server: {
-		proxy: {
-			'/api': {
-				target: 'http://backend:8000',
-				changeOrigin: true,
-				secure: false, // Pour le développement seulement
-				timeout: 10000
-			}
-		},
-		// SÉCURITÉ: En développement, bind seulement sur localhost
-		// host: '0.0.0.0' exposerait le serveur sur toutes les interfaces
-		// ce qui est un risque de sécurité en développement
-		host: '127.0.0.1', // ✅ Localhost uniquement pour sécurité
-		port: 5173,
-		strictPort: true
-	},
-	test: {
-		projects: [
-			{
-				extends: './vite.config.ts',
-				test: {
-					name: 'client',
-					environment: 'browser',
-					browser: {
-						enabled: true,
-						provider: 'playwright',
-						instances: [{ browser: 'chromium' }]
-					},
-					include: ['src/**/*.svelte.{test,spec}.{js,ts}'],
-					exclude: ['src/lib/server/**'],
-					setupFiles: ['./vitest-setup-client.ts']
-				}
-			},
-			{
-				extends: './vite.config.ts',
-				test: {
-					name: 'server',
-					environment: 'node',
-					include: ['src/**/*.{test,spec}.{js,ts}'],
-					exclude: ['src/**/*.svelte.{test,spec}.{js,ts}']
-				}
-			}
-		]
-	}
-});
+  plugins: [
+    vue(),
+    vuetify({
+      autoImport: true,
+      theme: {
+        defaultTheme: 'light'
+      }
+    })
+  ],
+  resolve: {
+    alias: {
+      '@': fileURLToPath(new URL('./src', import.meta.url))
+    }
+  },
+  server: {
+    host: '0.0.0.0',
+    port: 3000,
+    proxy: {
+      '/api': {
+        target: 'http://backend:8000',
+        changeOrigin: true,
+        secure: false
+      }
+    }
+  },
+  build: {
+    outDir: 'dist',
+    sourcemap: false,
+    minify: 'terser',
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['vue', 'vue-router', 'pinia'],
+          vuetify: ['vuetify']
+        }
+      }
+    }
+  },
+  css: {
+    preprocessorOptions: {
+      scss: {
+        additionalData: `@import "@/assets/styles/variables.scss";`
+      }
+    }
+  }
+})

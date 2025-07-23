@@ -1,4 +1,12 @@
-# Guide d’installation Redriva
+# Guide ```bash
+git clone <repo>
+cd redriva
+cp config/.env.example config/.env  # puis renseignez votre token RD
+docker compose up -d
+```
+
+Accédez à l'interface web sur [http://localhost:5174](http://localhost:5174)
+L'API backend est disponible sur [http://localhost:8000](http://localhost:8000)ation Redriva
 
 ## Prérequis
 - Docker et Docker Compose (recommandé)

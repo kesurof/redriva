@@ -1,5 +1,12 @@
 
-# Procédure de déploiement Redriva
+# Pr1. Clonez le dépôt et placez-vous à la racine.
+2. Copiez le fichier `.env` d'exemple dans `config/` et renseignez votre token Real-Debrid.
+3. Lancez :
+   ```sh
+   docker compose up -d
+   ```
+4. Accédez à l'interface web sur [http://localhost:5174](http://localhost:5174)
+5. L'API backend est disponible sur [http://localhost:8000](http://localhost:8000)de déploiement Redriva
 
 ## 1. Déploiement recommandé : Docker Compose
 

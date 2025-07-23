@@ -33,7 +33,7 @@ services:
       - ./frontend:/app
       - /app/node_modules
     ports:
-      - "5173:5173"
+      - "5174:5174"
     networks:
       - redriva-net
     depends_on:
@@ -42,9 +42,9 @@ services:
     environment:
       - NODE_ENV=development
       - VITE_API_URL=http://localhost:8080
-    command: npm run dev -- --host 0.0.0.0 --port 5173
+    command: npm run dev -- --host 0.0.0.0 --port 5174
     labels:
-      - "com.redriva.service=frontend"
+      - "com.redriva.service=frontend-vue"
 
 networks:
   redriva-net:
