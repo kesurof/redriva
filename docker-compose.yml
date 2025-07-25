@@ -1,5 +1,5 @@
 # Configuration Docker Compose - Développement
-# Approche unifiée "Zéro Réécriture" : même code, configuration différente
+# Frontend SvelteKit + Backend FastAPI
 
 services:
   # Backend avec hot reload
@@ -33,13 +33,13 @@ services:
       - "com.redriva.service=backend"
       - "com.redriva.env=development"
 
-  # Frontend avec hot reload
+  # Frontend SvelteKit avec hot reload
   frontend:
-    container_name: redriva-frontend
+    container_name: redriva-frontend-svelte
     build:
       context: ./frontend
       dockerfile: Dockerfile
-      target: development         # Utilise le stage development
+      target: development         # Utilise le stage development pour le dev
     volumes:
       - ./frontend:/app:rw        # Code source monté pour hot reload
       - /app/node_modules         # Éviter l'écrasement des node_modules
@@ -53,9 +53,9 @@ services:
     environment:
       - NODE_ENV=development
       - VITE_API_URL=http://localhost:8080
-    command: npm run dev -- --host 0.0.0.0 --port 5174
+    command: npm run dev
     labels:
-      - "com.redriva.service=frontend-vue"
+      - "com.redriva.service=frontend-svelte"
       - "com.redriva.env=development"
 
   # Redis pour cache et queue

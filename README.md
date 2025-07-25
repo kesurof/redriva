@@ -6,12 +6,13 @@ Redriva est une application web moderne qui simplifie la gestion de vos téléch
 
 ## ✨ Fonctionnalités
 
-- 🎯 **Interface moderne** - Vue.js 3 + Vuetify Material Design
+- 🎯 **Interface moderne** - SvelteKit + TailwindCSS + TypeScript
 - 🔄 **Gestion des torrents** - Ajout, suivi et téléchargement automatisé
-- 📊 **Monitoring en temps réel** - Métriques Prometheus intégrées
+- 📊 **Monitoring en temps réel** - Métriques et statistiques intégrées
 - 🔐 **Authentification sécurisée** - Intégration Real-Debrid OAuth
-- 🐳 **Déploiement simplifié** - Docker avec scripts ultra-simplifiés
-- ⚡ **Performance optimisée** - Cache Redis et workers asynchrones
+- 🐳 **Déploiement simplifié** - Docker avec configuration "Zéro Réécriture"
+- ⚡ **Performance optimisée** - SvelteKit pour des performances exceptionnelles
+- 🎨 **Thèmes personnalisables** - Mode sombre/clair et couleurs personnalisées
 
 ## 🚀 Démarrage Rapide
 
@@ -34,8 +35,8 @@ cp .env.example .env
 ./scripts/dev.sh start
 
 # 4. Accès immédiat
-# 🌐 Interface: http://localhost:5174
-# 🔧 API: http://localhost:8080/api
+# 🌐 Interface SvelteKit: http://localhost:5174
+# 🔧 API Backend: http://localhost:8080/api
 ```
 
 ### Déploiement Production
@@ -52,53 +53,74 @@ cp .env.prod.example .env.prod
 # 🌐 Application: http://localhost:3000
 ```
 
-## 🛠️ Commandes Essentielles
+## 🛠️ Architecture "Zéro Réécriture"
 
-### Développement
+Redriva respecte strictement la philosophie **"Zéro Réécriture de Code"** :
+
+### Principe Fondamental
+- **❌ JAMAIS d'installation locale** - Docker obligatoire
+- **Même code, configurations différentes** - Développement et production utilisent les mêmes sources
+- **Scripts unifiés** - `./scripts/dev.sh` et `./scripts/deploy.sh` pour tout contrôler
+- **Un seul Dockerfile** par service avec multi-stage build
+- **Configuration par environnement** - Variables d'environnement pour adapter le comportement
+
+### Commandes Essentielles
+
+#### Développement
 ```bash
 ./scripts/dev.sh start            # 🚀 Démarrer l'environnement
-./scripts/dev.sh stop             # ⏹️  Arrêter l'environnement
+./scripts/dev.sh stop             # ⏹️  Arrêter l'environnement  
 ./scripts/dev.sh logs             # 📋 Voir les logs en temps réel
 ./scripts/dev.sh shell            # 🐚 Accéder au shell backend
+./scripts/dev.sh shell frontend   # 🐚 Accéder au shell frontend
 ./scripts/dev.sh test             # 🧪 Lancer tous les tests
 ./scripts/dev.sh rebuild          # 🔄 Reconstruire complètement
 ./scripts/dev.sh clear-cache      # 🧹 Effacer le cache Docker (backend)
 ./scripts/dev.sh clear-cache all  # 🧹 Effacer le cache de tous les services
-```
 
-### Production
+## 🛠️ Architecture "Zéro Réécriture"
+
+Redriva respecte strictement la philosophie **"Zéro Réécriture de Code"** :
+
+### Principe Fondamental
+- **Même code, configurations différentes** - Développement et production utilisent les mêmes sources
+- **Docker uniquement** - Aucune installation locale requise
+- **Un seul Dockerfile** par service avec multi-stage build
+- **Configuration par environnement** - Variables d'environnement pour adapter le comportement
+
+### Commandes Essentielles
+
+#### Développement
 ```bash
-./scripts/deploy.sh deploy  # 🚀 Déployer en production
-./scripts/deploy.sh status  # 📊 Voir le statut des services
-./scripts/deploy.sh logs    # 📋 Logs de production
-./scripts/deploy.sh stop    # ⏹️  Arrêter la production
-```
-
-## 🏗️ Architecture
+docker compose up -d              # 🚀 Démarrer l'environnement
+docker compose down               # ⏹️  Arrêter l'environnement  
+docker compose logs -f            # 📋 Voir les logs en temps réel
+docker compose exec backend bash  # 🐚 Accéder au shell backend
+docker compose exec frontend sh   # 🐚 Accéder au shell frontend
+docker compose up -d --build      # � Reconstruire complètement
 
 Redriva utilise une **architecture unifiée révolutionnaire** basée sur la philosophie **"Zéro Réécriture de Code"** :
 
 ### Stack Technique
 ```
-Frontend  → Vue.js 3 + Vuetify + TypeScript
+Frontend  → SvelteKit + TailwindCSS + TypeScript
 Backend   → FastAPI + Python 3.12 + SQLite
-Cache     → Redis + ARQ (jobs asynchrones)
-Proxy     → Nginx (production)
-Deploy    → Docker + Scripts simplifiés
+Deploy    → Docker + Configuration par environnement
 ```
 
 ### Principe Fondamental
 - **Le même code** s'exécute en développement ET en production
 - **Seule la configuration** Docker change
 - **Un seul Dockerfile** par service (multi-stage)
-- **Complexité divisée par 3** grâce aux scripts unifiés
+- **❌ JAMAIS d'installation locale** - Docker obligatoire
+- **Complexité divisée par 3** grâce à l'approche unifiée
 
 ```
 📁 Structure Simplifiée
 redriva/
-├── frontend/           # Interface Vue.js + Vuetify
+├── frontend/           # Application SvelteKit + TailwindCSS
 ├── backend/            # API FastAPI + logique métier
-├── scripts/            # Scripts dev.sh + deploy.sh
+├── scripts/            # Scripts dev.sh + deploy.sh (OBLIGATOIRES)
 ├── docs/               # Documentation complète
 ├── docker-compose.yml  # Configuration développement
 └── docker-compose.prod.yml # Configuration production
@@ -108,11 +130,11 @@ redriva/
 
 | Page | URL | Description |
 |------|-----|-------------|
-| **Dashboard** | `/` | Tableau de bord principal avec vue d'ensemble |
-| **Torrents** | `/torrents` | Gestion et suivi des téléchargements |
+| **Dashboard** | `/` | Tableau de bord principal avec statistiques |
+| **Torrents** | `/torrents` | Gestion complète des téléchargements |
 | **Services** | `/services` | Monitoring des services connectés |
+| **Thèmes** | `/themes` | Personnalisation interface et couleurs |
 | **Paramètres** | `/settings` | Configuration et préférences |
-| **Démonstration** | `/demo` | Tests et démonstrations des fonctionnalités |
 
 ## 🔧 Configuration
 
@@ -155,20 +177,41 @@ REDIS_URL=redis://redis:6379/0
 
 ## 🧪 Tests et Qualité
 
+### Frontend (SvelteKit)
 ```bash
-# Tests Frontend (Vue.js + Vitest)
+# Accéder au conteneur frontend via script
 ./scripts/dev.sh shell frontend
+
+# Tests unitaires (Vitest)
 npm run test
 
-# Tests Backend (Python + Pytest)
+# Tests en mode watch
+npm run test:watch
+
+# Couverture de code
+npm run test:coverage
+
+# Vérification TypeScript
+npm run check
+
+# Linting et formatage
+npm run lint
+npm run format
+```
+
+### Backend (FastAPI)
+```bash
+# Accéder au conteneur backend via script
 ./scripts/dev.sh shell
+
+# Tests Python (Pytest)
 python -m pytest
 
-# Qualité du code
-./scripts/dev.sh lint
+# Tests avec couverture
+python -m pytest --cov=app
 
-# Tests complets
-./scripts/dev.sh test
+# Linting Python
+flake8 app/
 ```
 
 ## 🚨 Dépannage
@@ -180,13 +223,13 @@ python -m pytest
 ./scripts/dev.sh rebuild
 ```
 
-**Variables d'environnement modifiées (tokens, configuration) :**
+**Variables d'environnement modifiées :**
 ```bash
 # Effacer le cache pour prendre en compte les nouveaux tokens
 ./scripts/dev.sh clear-cache backend
 ```
 
-**Erreurs de dépendances :**
+**Erreurs de dépendances frontend :**
 ```bash
 ./scripts/dev.sh shell frontend
 npm install
@@ -205,10 +248,10 @@ npm install
 ./scripts/dev.sh db:reset
 ```
 
-**Nettoyage complet :**
+**Nettoyage complet du projet :**
 ```bash
-docker compose down --rmi all
-rm -rf frontend/node_modules
+./scripts/dev.sh stop
+./scripts/dev.sh clear-cache all
 ./scripts/dev.sh start
 ```
 
@@ -230,22 +273,19 @@ rm -rf frontend/node_modules
 
 - ✅ **Tokens sécurisés** - Variables d'environnement uniquement
 - ✅ **Réseau isolé** - Backend inaccessible directement
-- ✅ **Validation stricte** - Toutes les entrées validées
-- ✅ **Logs structurés** - Observabilité complète
-- ✅ **Tests automatisés** - Qualité garantie
+- ✅ **Validation stricte** - Pydantic + TypeScript
+- ✅ **CORS configuré** - Protection contre les attaques XSS
+- ✅ **Docker isolation** - Containérisation complète
+- ✅ **Pas d'installation locale** - Principe "Zéro Réécriture"
 
 ## 📚 Documentation
 
 | Document | Description |
 |----------|-------------|
-| **[Installation](docs/INSTALL.md)** | Guide d'installation détaillé |
-| **[Architecture](docs/ARCHITECTURE.md)** | Architecture technique complète |
-| **[Guide de Développement](docs/AI_DEVELOPMENT_GUIDE.md)** | Standards et bonnes pratiques |
+| **[Migration SvelteKit](README_SVELTEKIT.md)** | Guide complet de migration Vue.js → SvelteKit |
+| **[Architecture](docs/ARCHITECTURE.md)** | Architecture technique "Zéro Réécriture" |
 | **[Instructions IA](docs/AI_INSTRUCTIONS.md)** | Instructions complètes pour assistant IA |
-| **[Déploiement](docs/DEPLOIEMENT.md)** | Procédures de déploiement |
-| **[Clear Cache](scripts/CLEAR_CACHE.md)** | Guide de la fonction clear-cache |
-| **[Contribution](docs/CONTRIBUTING.md)** | Guide de contribution |
-| **[API](docs/USAGE.md)** | Documentation de l'API |
+| **[API](docs/USAGE.md)** | Documentation de l'API backend |
 
 ## 🤝 Contribution
 
@@ -254,7 +294,7 @@ Nous accueillons toutes les contributions ! Consultez notre [Guide de Contributi
 ### Workflow de Contribution
 1. Fork du projet
 2. Créer une branche feature (`git checkout -b feature/AmazingFeature`)
-3. Développer avec `./scripts/dev.sh`
+3. Développer avec `./scripts/dev.sh start`
 4. Tester avec `./scripts/dev.sh test`
 5. Commit (`git commit -m 'Add AmazingFeature'`)
 6. Push (`git push origin feature/AmazingFeature`)
@@ -266,17 +306,19 @@ Ce projet est sous licence MIT. Voir le fichier [LICENSE](LICENSE) pour plus de 
 
 ## 🌟 Remerciements
 
+- **[SvelteKit](https://kit.svelte.dev/)** - Framework full-stack moderne
+- **[TailwindCSS](https://tailwindcss.com/)** - Framework CSS utilitaire
+- **[TypeScript](https://www.typescriptlang.org/)** - JavaScript avec types
 - **[Real-Debrid](https://real-debrid.com/)** - Service de téléchargement premium
-- **[Vue.js](https://vuejs.org/)** - Framework frontend réactif
-- **[Vuetify](https://vuetifyjs.com/)** - Composants Material Design
 - **[FastAPI](https://fastapi.tiangolo.com/)** - Framework API moderne
-- **[Docker](https://docker.com/)** - Conteneurisation simplifiée
+- **[Docker](https://docker.com/)** - Conteneurisation "Zéro Réécriture"
 
 ---
 
 <div align="center">
 
-**Redriva** - *Révolutionnant la gestion Real-Debrid*
+**Redriva 2.0** - *Maintenant avec SvelteKit et architecture "Zéro Réécriture"*
+
 
 [🌐 Site Web](https://github.com/kesurof/redriva) • [📖 Documentation](docs/) • [🐛 Issues](https://github.com/kesurof/redriva/issues) • [💬 Discussions](https://github.com/kesurof/redriva/discussions)
 
