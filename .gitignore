@@ -26,3 +26,6 @@ node_modules/
 .vscode/
 .DS_Store
 *.swp
+
+# Lock files pour éviter les conflits
+/frontend/package-lock.json

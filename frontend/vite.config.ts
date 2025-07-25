@@ -1,16 +1,16 @@
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
-import vuetify from 'vite-plugin-vuetify'
 import { fileURLToPath, URL } from 'node:url'
+import Components from 'unplugin-vue-components/vite'
+import { PrimeVueResolver } from '@primevue/auto-import-resolver'
 
 export default defineConfig({
   plugins: [
     vue(),
-    vuetify({
-      autoImport: true,
-      theme: {
-        defaultTheme: 'light'
-      }
+    Components({
+      resolvers: [
+        PrimeVueResolver() // Active l'importation automatique pour PrimeVue
+      ]
     })
   ],
   resolve: {
@@ -36,8 +36,7 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: {
-          vendor: ['vue', 'vue-router', 'pinia'],
-          vuetify: ['vuetify']
+          vendor: ['vue', 'vue-router', 'pinia']
         }
       }
     }

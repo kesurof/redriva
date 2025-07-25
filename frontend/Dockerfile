@@ -14,7 +14,7 @@ FROM base AS development
 WORKDIR /app
 RUN npm install -g npm@latest
 COPY package*.json ./
-RUN npm ci --only=production=false --silent
+RUN npm install --silent
 
 # Script d'entrée pour gestion automatique des dépendances
 RUN echo '#!/bin/sh' > /docker-entrypoint.sh && \
