@@ -48,6 +48,22 @@ const routes: RouteRecordRaw[] = [
         }
       },
       {
+        path: '/theme-demo',
+        name: 'ThemeDemo',
+        component: () => import('@/pages/ThemeDemo.vue'),
+        meta: {
+          title: 'Démo Thème Aura - Redriva'
+        }
+      },
+      {
+        path: '/theme-settings',
+        name: 'ThemeSettings',
+        component: () => import('@/pages/ThemeSettings.vue'),
+        meta: {
+          title: 'Paramètres du Thème - Redriva'
+        }
+      },
+      {
         path: '/sakai-demo',
         name: 'SakaiDemo',
         component: () => import('@/pages/SakaiDemo.vue'),
