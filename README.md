@@ -77,27 +77,17 @@ Redriva respecte strictement la philosophie **"Zéro Réécriture de Code"** :
 ./scripts/dev.sh rebuild          # 🔄 Reconstruire complètement
 ./scripts/dev.sh clear-cache      # 🧹 Effacer le cache Docker (backend)
 ./scripts/dev.sh clear-cache all  # 🧹 Effacer le cache de tous les services
+```
 
-## 🛠️ Architecture "Zéro Réécriture"
-
-Redriva respecte strictement la philosophie **"Zéro Réécriture de Code"** :
-
-### Principe Fondamental
-- **Même code, configurations différentes** - Développement et production utilisent les mêmes sources
-- **Docker uniquement** - Aucune installation locale requise
-- **Un seul Dockerfile** par service avec multi-stage build
-- **Configuration par environnement** - Variables d'environnement pour adapter le comportement
-
-### Commandes Essentielles
-
-#### Développement
+#### Alternative Docker Compose directe
 ```bash
 docker compose up -d              # 🚀 Démarrer l'environnement
 docker compose down               # ⏹️  Arrêter l'environnement  
 docker compose logs -f            # 📋 Voir les logs en temps réel
 docker compose exec backend bash  # 🐚 Accéder au shell backend
 docker compose exec frontend sh   # 🐚 Accéder au shell frontend
-docker compose up -d --build      # � Reconstruire complètement
+docker compose up -d --build      # 🔄 Reconstruire complètement
+```
 
 Redriva utilise une **architecture unifiée révolutionnaire** basée sur la philosophie **"Zéro Réécriture de Code"** :
 

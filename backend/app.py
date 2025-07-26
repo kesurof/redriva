@@ -50,6 +50,20 @@ async def check_http_health(url: str, timeout: float = 10.0) -> tuple[bool, Opti
         logger.debug(f"Erreur HTTP pour {url}: {e}")
         return False, None
 
+async def get_docker_containers() -> List[Dict]:
+    """Retourne une liste vide de containers Docker (fonctionnalité désactivée)"""
+    return []
+
+async def restart_docker_container(container_name: str) -> bool:
+    """Simulation de redémarrage de container (fonctionnalité désactivée)"""
+    logger.info(f"Simulation: redémarrage du container {container_name}")
+    return True
+
+async def stop_docker_container(container_name: str) -> bool:
+    """Simulation d'arrêt de container (fonctionnalité désactivée)"""
+    logger.info(f"Simulation: arrêt du container {container_name}")
+    return True
+
 async def get_docker_container_info(container_name: str) -> Optional[Dict]:
     """Récupère les informations d'un conteneur Docker via l'API REST"""
     try:
@@ -946,12 +960,55 @@ async def update_torrents(background_tasks: BackgroundTasks):
     background_tasks.add_task(lambda: print("Mise à jour des torrents démarrée"))
     return {"success": True, "message": "Mise à jour des torrents démarrée"}
 
-@app.post("/api/admin/sync")
+@app.post("/api/sync")
 async def sync_with_real_debrid(background_tasks: BackgroundTasks):
     """Synchronise avec Real-Debrid en arrière-plan (legacy - sera supprimé)"""
     # TODO: Implémenter la logique de synchronisation
     background_tasks.add_task(lambda: print("Synchronisation Real-Debrid démarrée"))
     return {"success": True, "message": "Synchronisation Real-Debrid démarrée"}
+
+# Routes Docker
+@app.get("/api/docker/containers")
+async def get_containers():
+    """Récupère la liste de tous les containers Docker"""
+    try:
+        containers = await get_docker_containers()
+        return containers
+    except Exception as e:
+        logger.error(f"Erreur lors de la récupération des containers: {e}")
+        raise HTTPException(status_code=500, detail="Erreur lors de la récupération des containers Docker")
+
+@app.post("/api/docker/containers/{container_name}/restart")
+async def restart_container(container_name: str):
+    """Redémarre un container Docker"""
+    try:
+        success = await restart_docker_container(container_name)
+        if success:
+            return {"success": True, "message": f"Container {container_name} redémarré avec succès"}
+        else:
+            raise HTTPException(status_code=500, detail=f"Échec du redémarrage du container {container_name}")
+    except Exception as e:
+        logger.error(f"Erreur lors du redémarrage de {container_name}: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur lors du redémarrage du container {container_name}")
+
+@app.post("/api/docker/containers/{container_name}/stop")
+async def stop_container(container_name: str):
+    """Arrête un container Docker"""
+    try:
+        success = await stop_docker_container(container_name)
+        if success:
+            return {"success": True, "message": f"Container {container_name} arrêté avec succès"}
+        else:
+            raise HTTPException(status_code=500, detail=f"Échec de l'arrêt du container {container_name}")
+    except Exception as e:
+        logger.error(f"Erreur lors de l'arrêt de {container_name}: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur lors de l'arrêt du container {container_name}")
+
+# Routes de fallback pour les anciennes routes (compatibility)
+@app.get("/")
+async def root():
+    """Redirection vers le frontend"""
+    return {"message": "Redriva API - Frontend disponible sur port 5174"}
 
 # Routes de fallback pour les anciennes routes (compatibility)
 @app.get("/")

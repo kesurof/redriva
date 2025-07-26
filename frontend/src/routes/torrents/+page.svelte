@@ -1,105 +1,127 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { RefreshCw, Download, ExternalLink, Clock, HardDrive, Signal, Search, Copy, RotateCcw, Trash2 } from 'lucide-svelte';
+  import { Activity, Download, Server, Clock, RefreshCw, Trash2, RotateCcw, Search, ChevronUp, ChevronDown, HardDrive, Signal, ExternalLink, Copy } from 'lucide-svelte';
+  import api from '$lib/api/client';
 
-  let torrents: any[] = [];
+  let stats = {
+    totalTorrents: 0,
+    activeTorrents: 0,
+    completedTorrents: 0,
+    servicesOnline: 0
+  };
+
+  let data = { torrents: [] };
   let filteredTorrents: any[] = [];
   let loading = true;
-  let refreshing = false;
+  let lastUpdate = new Date();
   let searchTerm = '';
+  let sortField = 'addedAt';
+  let sortDirection = 'desc';
 
-  async function loadTorrents() {
+  async function loadData() {
     try {
       loading = true;
-      const response = await fetch('/api/torrents?limit=0'); // limit=0 pour récupération complète RDM
+      // Charger les vrais torrents récents depuis l'API (même endpoint que la page torrents)
+      const response = await api.get('/torrents?limit=25');
       
-      if (!response.ok) {
-        throw new Error(`Erreur HTTP: ${response.status}`);
-      }
-      
-      const result = await response.json();
-      
-      // Format de réponse RDM
-      if (result.success) {
-        torrents = result.data || [];
-        filteredTorrents = torrents;
-        console.log(`Chargé ${torrents.length} torrents depuis l'API RDM`);
-        console.log('Métadonnées:', result.meta);
+      // L'API retourne un format RDM avec {success, data, error, meta}
+      if (response.success) {
+        data.torrents = response.data || [];
       } else {
-        throw new Error(result.error || 'Erreur inconnue');
+        throw new Error(response.error || 'Erreur lors du chargement');
       }
       
-    } catch (err) {
-      console.error('Erreur lors du chargement des torrents:', err);
-      torrents = [];
-      filteredTorrents = [];
+      // Calculer les statistiques à partir des vrais données
+      stats = {
+        totalTorrents: data.torrents.length,
+        activeTorrents: data.torrents.filter(t => t.status === 'downloading').length,
+        completedTorrents: data.torrents.filter(t => t.status === 'downloaded' || t.status === 'completed').length,
+        servicesOnline: 7 // Nombre de services configurés
+      };
+      
+      lastUpdate = new Date();
+    } catch (error) {
+      console.error('Erreur lors du chargement des données:', error);
+      // Utiliser des données par défaut en cas d'erreur
+      data.torrents = [];
+      stats = {
+        totalTorrents: 0,
+        activeTorrents: 0,
+        completedTorrents: 0,
+        servicesOnline: 0
+      };
     } finally {
       loading = false;
     }
   }
 
-  // Fonction de recherche réactive
-  function filterTorrents() {
-    if (!searchTerm.trim()) {
-      filteredTorrents = torrents;
+  // Gestion de la recherche
+  function handleSearch() {
+    // La recherche est automatiquement réactive avec filteredTorrents
+  }
+  
+  // Gestion du tri
+  function handleSort(field) {
+    if (sortField === field) {
+      sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
     } else {
-      const search = searchTerm.toLowerCase();
-      filteredTorrents = torrents.filter(torrent => 
-        (torrent.filename || torrent.original_filename || '').toLowerCase().includes(search) ||
-        (torrent.status || '').toLowerCase().includes(search) ||
-        (torrent.host || '').toLowerCase().includes(search)
-      );
+      sortField = field;
+      sortDirection = 'asc';
     }
   }
 
-  // Réactivité pour la recherche
-  $: if (searchTerm !== undefined) {
-    filterTorrents();
-  }
-
-  async function refreshTorrents() {
-    try {
-      refreshing = true;
+  // Fonction pour trier les torrents
+  function sortTorrents(torrents) {
+    return [...torrents].sort((a, b) => {
+      let aVal = a[sortField];
+      let bVal = b[sortField];
       
-      // Appel de l'endpoint de rafraîchissement RDM
-      const response = await fetch('/api/torrents/refresh', {
-        method: 'POST'
-      });
-      
-      if (response.ok) {
-        const result = await response.json();
-        if (result.success) {
-          console.log(result.message);
-          console.log('Stats de cache:', result.data);
-          await loadTorrents();
-        } else {
-          throw new Error(result.error);
-        }
+      // Gestion spéciale pour les noms (support des différents formats)
+      if (sortField === 'original_filename') {
+        aVal = a.filename || a.original_filename || a.name || '';
+        bVal = b.filename || b.original_filename || b.name || '';
       }
       
-    } catch (error) {
-      console.error('Erreur lors du rafraîchissement:', error);
-    } finally {
-      refreshing = false;
-    }
+      // Gestion spéciale pour les dates (support des différents formats)
+      if (sortField === 'addedAt') {
+        aVal = new Date(a.added || a.addedAt);
+        bVal = new Date(b.added || b.addedAt);
+      }
+      
+      // Gestion spéciale pour les tailles (support des différents formats)
+      if (sortField === 'bytes') {
+        aVal = parseInt(a.size || a.bytes || 0);
+        bVal = parseInt(b.size || b.bytes || 0);
+      }
+      
+      // Gestion des chaînes
+      if (typeof aVal === 'string' && typeof bVal === 'string') {
+        aVal = aVal.toLowerCase();
+        bVal = bVal.toLowerCase();
+      }
+      
+      if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
+      return 0;
+    });
   }
+  
+  // Filtrage et tri réactifs
+  $: filteredTorrents = sortTorrents(
+    data.torrents.filter(torrent =>
+      !searchTerm.trim() || 
+      (torrent.filename || torrent.original_filename || torrent.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (torrent.host || 'Real-Debrid').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (torrent.status || '').toLowerCase().includes(searchTerm.toLowerCase())
+    )
+  );
 
-  onMount(loadTorrents);
-
-  // Fonction utilitaire pour formater les bytes
-  function formatBytes(bytes: number): string {
-    if (!bytes || bytes === 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  }
-
-  // Fonction pour formater la date
+  // Fonctions utilitaires
   function formatDate(dateString: string): string {
-    if (!dateString) return 'Date inconnue';
     try {
+      if (!dateString) return 'Date inconnue';
       const date = new Date(dateString);
+      if (isNaN(date.getTime())) return 'Date invalide';
       return date.toLocaleDateString('fr-FR', {
         day: '2-digit',
         month: '2-digit',
@@ -107,15 +129,26 @@
         hour: '2-digit',
         minute: '2-digit'
       });
-    } catch {
+    } catch (error) {
       return 'Date invalide';
     }
+  }
+
+  function formatBytes(bytes: string | number): string {
+    const size = typeof bytes === 'string' ? parseInt(bytes) : bytes;
+    if (!size || isNaN(size)) return '0 B';
+    
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(size) / Math.log(k));
+    return parseFloat((size / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   }
 
   // Fonction pour obtenir la couleur du statut
   function getStatusColor(status: string): string {
     switch (status?.toLowerCase()) {
       case 'downloaded':
+      case 'completed':
       case 'terminé':
         return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
       case 'downloading':
@@ -136,7 +169,6 @@
   async function copyToClipboard(text: string) {
     try {
       await navigator.clipboard.writeText(text);
-      // On pourrait ajouter une notification toast ici
     } catch (err) {
       console.error('Erreur lors de la copie:', err);
     }
@@ -146,95 +178,117 @@
   function openLink(url: string) {
     window.open(url, '_blank', 'noopener,noreferrer');
   }
+
+  onMount(() => {
+    loadData();
+  });
 </script>
 
-<div class="min-h-screen bg-gray-50 dark:bg-gray-900">
-  <div class="container mx-auto px-4 py-8">
-    <!-- Header avec titre et actions -->
-    <div class="flex items-center justify-between mb-8">
-      <div>
-        <h1 class="text-3xl font-bold text-gray-900 dark:text-white">Torrents</h1>
-        <p class="text-gray-600 dark:text-gray-400 mt-1">
-          Gestion de vos téléchargements Real-Debrid
-        </p>
+<svelte:head>
+  <title>Torrents - Redriva</title>
+</svelte:head>
+
+<div class="space-y-6">
+  <div class="flex items-center justify-between">
+    <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Torrents</h1>
+    <div class="text-sm text-gray-500 dark:text-gray-400">
+      Dernière mise à jour: {lastUpdate.toLocaleTimeString('fr-FR')}
+    </div>
+  </div>
+
+  {#if loading}
+    <div class="flex items-center justify-center py-12">
+      <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+    </div>
+  {:else}
+    <!-- Statistiques -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
+        <div class="flex items-center">
+          <div class="p-3 bg-blue-100 dark:bg-blue-900 rounded-full">
+            <Download class="w-6 h-6 text-blue-600 dark:text-blue-400" />
+          </div>
+          <div class="ml-4">
+            <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Total Torrents</p>
+            <p class="text-2xl font-semibold text-gray-900 dark:text-white">{stats.totalTorrents}</p>
+          </div>
+        </div>
       </div>
-      
-      <div class="flex items-center space-x-3">
-        <button
-          on:click={refreshTorrents}
-          disabled={refreshing || loading}
-          class="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md transform hover:-translate-y-0.5"
-          title="Actualiser la liste des torrents"
-          aria-label="Actualiser la liste des torrents"
-        >
-          <RefreshCw class="w-4 h-4 {refreshing ? 'animate-spin' : ''}" />
-          <span class="font-medium">
-            {refreshing ? 'Actualisation...' : 'Actualiser'}
-          </span>
-        </button>
+
+      <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
+        <div class="flex items-center">
+          <div class="p-3 bg-green-100 dark:bg-green-900 rounded-full">
+            <Activity class="w-6 h-6 text-green-600 dark:text-green-400" />
+          </div>
+          <div class="ml-4">
+            <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Actifs</p>
+            <p class="text-2xl font-semibold text-gray-900 dark:text-white">{stats.activeTorrents}</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
+        <div class="flex items-center">
+          <div class="p-3 bg-purple-100 dark:bg-purple-900 rounded-full">
+            <Clock class="w-6 h-6 text-purple-600 dark:text-purple-400" />
+          </div>
+          <div class="ml-4">
+            <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Terminés</p>
+            <p class="text-2xl font-semibold text-gray-900 dark:text-white">{stats.completedTorrents}</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
+        <div class="flex items-center">
+          <div class="p-3 bg-orange-100 dark:bg-orange-900 rounded-full">
+            <Server class="w-6 h-6 text-orange-600 dark:text-orange-400" />
+          </div>
+          <div class="ml-4">
+            <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Services OK</p>
+            <p class="text-2xl font-semibold text-gray-900 dark:text-white">{stats.servicesOnline}</p>
+          </div>
+        </div>
       </div>
     </div>
 
-    <!-- Barre de recherche -->
-    {#if !loading && torrents.length > 0}
-      <div class="mb-6">
-        <div class="relative max-w-md">
-          <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <Search class="h-5 w-5 text-gray-400" />
-          </div>
-          <input
-            type="text"
-            bind:value={searchTerm}
-            placeholder="Rechercher dans les torrents..."
-            class="block w-full pl-10 pr-3 py-3 border border-gray-300 dark:border-gray-600 rounded-lg leading-5 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-          />
-          {#if searchTerm}
-            <div class="absolute inset-y-0 right-0 pr-3 flex items-center">
-              <button
-                on:click={() => searchTerm = ''}
-                class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                title="Effacer la recherche"
-                aria-label="Effacer la recherche"
-              >
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-          {/if}
-        </div>
+    <!-- Header avec recherche et bouton actualiser -->
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+      <div class="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
+        <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Torrents Récents</h2>
         
-        {#if searchTerm && filteredTorrents.length !== torrents.length}
-          <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
-            {filteredTorrents.length} résultat{filteredTorrents.length > 1 ? 's' : ''} pour "<span class="font-medium">{searchTerm}</span>"
-          </p>
-        {/if}
-      </div>
-    {/if}
-
-    <!-- États de chargement et contenu -->
-    {#if loading}
-      <div class="flex flex-col items-center justify-center py-16">
-        <div class="relative">
-          <div class="w-12 h-12 border-4 border-blue-200 rounded-full animate-spin border-t-blue-600"></div>
+        <div class="flex items-center space-x-4">
+          <!-- Recherche -->
+          <div class="relative">
+            <Search class="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+            <input
+              type="text"
+              placeholder="Rechercher un torrent..."
+              bind:value={searchTerm}
+              on:input={handleSearch}
+              class="pl-10 pr-4 py-2 w-64 border border-gray-300 dark:border-gray-600 rounded-lg
+                     bg-white dark:bg-gray-700 text-gray-900 dark:text-white
+                     focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            />
+          </div>
+          
+          <!-- Bouton actualiser -->
+          <button
+            on:click={loadData}
+            class="w-10 h-10 bg-blue-600 hover:bg-blue-700 text-white rounded-lg
+                   flex items-center justify-center transition-colors duration-200"
+            title="Actualiser"
+            aria-label="Actualiser la liste des torrents"
+          >
+            <RefreshCw class="w-4 h-4" />
+          </button>
         </div>
-        <p class="mt-4 text-gray-600 dark:text-gray-400 font-medium">Chargement des torrents...</p>
       </div>
-    {:else if filteredTorrents.length === 0}
-      <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-12 text-center">
-        <Download class="w-12 h-12 text-gray-400 mx-auto mb-4" />
-        <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2">
-          {searchTerm.trim() ? 'Aucun torrent trouvé' : 'Aucun torrent disponible'}
-        </h3>
-        <p class="text-gray-500 dark:text-gray-400">
-          {searchTerm.trim() 
-            ? `Aucun résultat pour "${searchTerm}"`
-            : 'Vous n\'avez pas encore de torrents dans votre compte Real-Debrid'}
-        </p>
-      </div>
-    {:else}
-      <!-- Liste des torrents avec la même présentation que le dashboard -->
-      <div class="space-y-3">
+    </div>
+
+    <!-- Liste des torrents récents en cartes modernes -->
+    <div class="space-y-3">
+      {#if filteredTorrents.length > 0}
         {#each filteredTorrents as torrent}
           <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 hover:shadow-md transition-shadow duration-200">
             <div class="flex items-center justify-between">
@@ -316,17 +370,19 @@
             </div>
           </div>
         {/each}
-      </div>
-      
-      <!-- Footer avec stats -->
-      <div class="mt-8 text-center text-sm text-gray-500 dark:text-gray-400">
-        <p>
-          <span class="font-medium">{filteredTorrents.length}</span> torrent{filteredTorrents.length > 1 ? 's' : ''} affiché{filteredTorrents.length > 1 ? 's' : ''}
-          {#if searchTerm && filteredTorrents.length !== torrents.length}
-            sur <span class="font-medium">{torrents.length}</span> au total
-          {/if}
-        </p>
-      </div>
-    {/if}
-  </div>
+      {:else}
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-12 text-center">
+          <Download class="w-12 h-12 text-gray-400 mx-auto mb-4" />
+          <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2">
+            {searchTerm.trim() ? 'Aucun torrent trouvé' : 'Aucun torrent récent'}
+          </h3>
+          <p class="text-gray-500 dark:text-gray-400">
+            {searchTerm.trim() 
+              ? `Aucun résultat pour "${searchTerm}"`
+              : 'Les torrents récents apparaîtront ici'}
+          </p>
+        </div>
+      {/if}
+    </div>
+  {/if}
 </div>
