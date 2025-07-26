@@ -1,6 +1,8 @@
 <script lang="ts">
-  import { Settings, Save, Key, Database, Bell, Shield } from 'lucide-svelte';
+  import { Settings, Save, Key, Database, Bell, Shield, Eye, EyeOff } from 'lucide-svelte';
   import { addNotification } from '$lib/stores/notifications';
+  import { onMount } from 'svelte';
+  import api from '$lib/api/client';
 
   let settings = {
     realDebrid: {
@@ -21,22 +23,75 @@
     }
   };
 
+  let showToken = false;
+  let tokenInput = '';
+  let tokenSaved = false;
+
+  // Charger les paramètres au démarrage
+  onMount(async () => {
+    try {
+      const response = await api.get('/settings');
+      settings = { ...settings, ...response.data };
+      tokenSaved = !!settings.realDebrid.token;
+      if (tokenSaved) {
+        tokenInput = settings.realDebrid.token;
+      }
+    } catch (error) {
+      console.error('Erreur lors du chargement des paramètres:', error);
+    }
+  });
+
+  function maskToken(token: string): string {
+    if (!token || token.length < 8) return token;
+    const start = token.substring(0, 4);
+    const end = token.substring(token.length - 4);
+    const middle = '*'.repeat(Math.max(0, token.length - 8));
+    return `${start}${middle}${end}`;
+  }
+
+  function toggleTokenVisibility() {
+    showToken = !showToken;
+  }
+
+  async function saveToken() {
+    if (!tokenInput.trim()) {
+      console.log('Token requis - Veuillez entrer un token Real-Debrid valide');
+      alert('Veuillez entrer un token Real-Debrid valide');
+      return;
+    }
+
+    try {
+      const response = await api.post('/settings/realdebrid', { 
+        token: tokenInput.trim() 
+      });
+
+      settings.realDebrid.token = tokenInput.trim();
+      tokenSaved = true;
+      showToken = false;
+      
+      console.log('Token sauvegardé avec succès');
+      alert('Token Real-Debrid sauvegardé avec succès !');
+    } catch (error) {
+      console.error('Erreur lors de la sauvegarde du token:', error);
+      alert('Erreur lors de la sauvegarde du token Real-Debrid');
+    }
+  }
+
+  function editToken() {
+    tokenSaved = false;
+    showToken = true;
+  }
+
   async function saveSettings() {
     try {
       // Simuler la sauvegarde (à implémenter avec l'API)
       await new Promise(resolve => setTimeout(resolve, 1000));
       
-      addNotification({
-        type: 'success',
-        title: 'Paramètres sauvegardés',
-        message: 'Vos paramètres ont été enregistrés avec succès'
-      });
+      console.log('Paramètres sauvegardés avec succès');
+      alert('Paramètres sauvegardés avec succès !');
     } catch (error) {
-      addNotification({
-        type: 'error',
-        title: 'Erreur de sauvegarde',
-        message: 'Impossible de sauvegarder les paramètres'
-      });
+      console.error('Erreur lors de la sauvegarde des paramètres:', error);
+      alert('Erreur lors de la sauvegarde des paramètres');
     }
   }
 
@@ -111,16 +166,78 @@
         <label for="rd-token" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
           Token API Real-Debrid
         </label>
-        <input
-          id="rd-token"
-          type="password"
-          bind:value={settings.realDebrid.token}
-          placeholder="Entrez votre token Real-Debrid"
-          class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg 
-                 bg-white dark:bg-gray-700 text-gray-900 dark:text-white
-                 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-        />
-        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+        
+        {#if tokenSaved && !showToken}
+          <!-- Affichage du token masqué -->
+          <div class="flex items-center space-x-3">
+            <div class="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg 
+                        bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white font-mono text-sm">
+              {maskToken(settings.realDebrid.token)}
+            </div>
+            <button
+              on:click={toggleTokenVisibility}
+              class="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+              title="Afficher le token"
+            >
+              <Eye class="w-4 h-4" />
+            </button>
+            <button
+              on:click={editToken}
+              class="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+            >
+              Modifier
+            </button>
+          </div>
+          <div class="flex items-center mt-2">
+            <Shield class="w-4 h-4 text-green-500 mr-1" />
+            <span class="text-xs text-green-600 dark:text-green-400">Token configuré et sécurisé</span>
+          </div>
+        {:else}
+          <!-- Saisie/modification du token -->
+          <div class="space-y-3">
+            <div class="flex items-center space-x-3">
+              <div class="flex-1 relative">
+                <input
+                  id="rd-token"
+                  type={showToken ? 'text' : 'password'}
+                  bind:value={tokenInput}
+                  placeholder="Entrez votre token Real-Debrid"
+                  class="w-full px-3 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg 
+                         bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-mono
+                         focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+                <button
+                  on:click={toggleTokenVisibility}
+                  class="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                  title={showToken ? 'Masquer' : 'Afficher'}
+                >
+                  {#if showToken}
+                    <EyeOff class="w-4 h-4" />
+                  {:else}
+                    <Eye class="w-4 h-4" />
+                  {/if}
+                </button>
+              </div>
+              <button
+                on:click={saveToken}
+                disabled={!tokenInput.trim()}
+                class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-sm font-medium"
+              >
+                Sauvegarder
+              </button>
+            </div>
+            {#if tokenSaved}
+              <button
+                on:click={() => { tokenSaved = true; showToken = false; tokenInput = settings.realDebrid.token; }}
+                class="text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+              >
+                Annuler
+              </button>
+            {/if}
+          </div>
+        {/if}
+        
+        <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">
           Obtenez votre token sur <a href="https://real-debrid.com/apitoken" target="_blank" class="text-blue-600 hover:underline">real-debrid.com/apitoken</a>
         </p>
       </div>

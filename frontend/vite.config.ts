@@ -9,9 +9,9 @@ export default defineConfig({
 		port: 5174,
 		proxy: {
 			'/api': {
-				target: 'http://localhost:8080',
+				target: 'http://backend:8000',
 				changeOrigin: true,
-				rewrite: (path) => path.replace(/^\/api/, '')
+				secure: false
 			}
 		}
 	},

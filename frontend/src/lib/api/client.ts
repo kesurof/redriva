@@ -41,4 +41,47 @@ api.interceptors.response.use(
   }
 );
 
-export default api;
+// Wrapper pour simplifier les appels API
+const apiClient = {
+  async get(url: string) {
+    try {
+      const response = await api.get(url);
+      return response.data;
+    } catch (error) {
+      console.error(`Erreur API GET ${url}:`, error);
+      throw error;
+    }
+  },
+
+  async post(url: string, data?: any) {
+    try {
+      const response = await api.post(url, data);
+      return response.data;
+    } catch (error) {
+      console.error(`Erreur API POST ${url}:`, error);
+      throw error;
+    }
+  },
+
+  async put(url: string, data?: any) {
+    try {
+      const response = await api.put(url, data);
+      return response.data;
+    } catch (error) {
+      console.error(`Erreur API PUT ${url}:`, error);
+      throw error;
+    }
+  },
+
+  async delete(url: string) {
+    try {
+      const response = await api.delete(url);
+      return response.data;
+    } catch (error) {
+      console.error(`Erreur API DELETE ${url}:`, error);
+      throw error;
+    }
+  }
+};
+
+export default apiClient;

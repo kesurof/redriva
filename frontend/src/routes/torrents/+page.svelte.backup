@@ -1,0 +1,667 @@
+<script lang="ts">
+  import { onMount } from 'svelte';
+  import { Plus, Download, Trash2, ExternalLink, Search, ChevronUp, ChevronDown, RefreshCw, RotateCcw } from 'lucide-svelte';
+
+  let torrents: any[] = [];
+  let filteredTorrents: any[] = [];
+  let loading = true;
+  let showAddModal = false;
+  let newTorrentUrl = '';
+  let searchTerm = '';
+  let sortField = 'addedAt';
+  let sortDirection = 'desc';
+  let error: string | null = null;
+  
+  // Système de cache et rafraîchissement  
+  let cacheInfo: any = null;
+  let refreshing = false;
+  
+  // Pagination
+  let paginatedTorrents: any[] = [];
+  let currentPage = 1;
+  let totalPages = 1;
+  let itemsPerPage = 25; // Variable manquante
+  let torrentsPerPage = 25;
+  
+  // Pagination
+  let currentPage = 1;
+  let torrentsPerPage = 25;
+  let totalPages = 1;
+  let paginatedTorrents: any[] = [];
+
+  // Réactivité forcée
+  $: isLoading = loading;
+  $: hasData = paginatedTorrents.length > 0;
+
+  onMount(async () => {
+    await loadTorrents();
+  });
+
+  async function loadTorrents() {
+    try {
+      console.log('[DEBUG] Début de loadTorrents()');
+      loading = true;
+      
+      // Appel direct à l'API sans authentification
+      const response = await fetch('/api/torrents?limit=1000&page=1');
+      console.log('[DEBUG] Response status:', response.status);
+      
+      if (!response.ok) {
+        throw new Error(`Erreur HTTP: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log('[DEBUG] Données reçues:', data);
+      console.log('[DEBUG] Nombre de torrents:', data.length);
+      
+      torrents = data || [];
+      console.log('[DEBUG] Torrents assignés:', torrents.length);
+      
+      applyFiltersAndSort();
+      console.log('[DEBUG] Après applyFiltersAndSort, paginatedTorrents:', paginatedTorrents.length);
+      
+      // Charger les informations de cache
+      await loadCacheInfo();
+      
+    } catch (err) {
+      console.error('Erreur lors du chargement des torrents:', err);
+      error = `Erreur de chargement: ${err.message}`;
+      torrents = [];
+      filteredTorrents = [];
+      paginatedTorrents = [];
+    } finally {
+      // Force la réactivité en créant une nouvelle assignation
+      console.log('[DEBUG] Finally block - setting loading to false');
+      loading = false;
+      // Force également la mise à jour des tableaux pour être sûr
+      torrents = [...torrents];
+      console.log('[DEBUG] Final state - loading:', loading, 'torrents count:', torrents.length, 'paginatedTorrents count:', paginatedTorrents.length);
+    }
+  }
+
+  async function refreshTorrents() {
+    try {
+      refreshing = true;
+      
+      // Appel de l'endpoint de rafraîchissement
+      const response = await fetch('/api/torrents/refresh', {
+        method: 'POST'
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Erreur HTTP: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      
+      // Recharger les torrents
+      await loadTorrents();
+      
+      // Afficher message de succès
+      console.log(result.message);
+      
+    } catch (err: any) {
+      console.error('Erreur lors du rafraîchissement:', err);
+      alert(`Erreur de rafraîchissement: ${err.message}`);
+    } finally {
+      refreshing = false;
+    }
+  }
+
+  async function loadCacheInfo() {
+    try {
+      const response = await fetch('/api/torrents/cache/info');
+      if (response.ok) {
+        cacheInfo = await response.json();
+      }
+    } catch (error) {
+      console.error('Erreur lors du chargement des infos de cache:', error);
+    }
+  }
+
+  function applyFiltersAndSort() {
+    // Filtrer par recherche
+    let filtered = torrents;
+    if (searchTerm.trim()) {
+      const search = searchTerm.toLowerCase();
+      filtered = torrents.filter(torrent => 
+        torrent.original_filename?.toLowerCase().includes(search) ||
+        torrent.host?.toLowerCase().includes(search) ||
+        torrent.status?.toLowerCase().includes(search)
+      );
+    }
+
+    // Trier
+    filtered.sort((a, b) => {
+      let aValue = a[sortField];
+      let bValue = b[sortField];
+
+      if (sortField === 'addedAt') {
+        aValue = new Date(aValue).getTime();
+        bValue = new Date(bValue).getTime();
+      } else if (sortField === 'bytes') {
+        aValue = parseInt(aValue) || 0;
+        bValue = parseInt(bValue) || 0;
+      } else {
+        aValue = String(aValue || '').toLowerCase();
+        bValue = String(bValue || '').toLowerCase();
+      }
+
+      if (sortDirection === 'asc') {
+        return aValue > bValue ? 1 : -1;
+      } else {
+        return aValue < bValue ? 1 : -1;
+      }
+    });
+
+    filteredTorrents = filtered;
+    updatePagination();
+  }
+
+    function updatePagination() {
+    totalPages = Math.ceil(filteredTorrents.length / itemsPerPage);
+    currentPage = Math.min(currentPage, Math.max(1, totalPages));
+    
+    const start = (currentPage - 1) * itemsPerPage;
+    const end = start + itemsPerPage;
+    paginatedTorrents = filteredTorrents.slice(start, end);
+  }
+
+  function handleSort(field: string) {
+    if (sortField === field) {
+      sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+    } else {
+      sortField = field;
+      sortDirection = 'desc';
+    }
+    applyFiltersAndSort();
+  }
+
+  function handleSearch() {
+    currentPage = 1; // Reset à la première page lors de la recherche
+    applyFiltersAndSort();
+  }
+
+  function changePage(page: number) {
+    if (page >= 1 && page <= totalPages) {
+      currentPage = page;
+      updatePagination();
+    }
+  }
+
+  function changeTorrentsPerPage(newValue: number) {
+    torrentsPerPage = newValue;
+    currentPage = 1; // Reset à la première page
+    
+    // Recharger les données si nécessaire avec la nouvelle limite
+    if (newValue > torrents.length && torrents.length % 1000 === 0) {
+      // Si on demande plus que ce qu'on a et qu'on a probablement plus de données
+      loadTorrents();
+    } else {
+      applyFiltersAndSort();
+    }
+  }
+
+  // Fonctions de formatage (copiées du dashboard)
+  function formatDate(dateString: string): string {
+    try {
+      if (!dateString) return 'Date inconnue';
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return 'Date invalide';
+      return date.toLocaleDateString('fr-FR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch (error) {
+      return 'Date invalide';
+    }
+  }
+
+  function formatBytes(bytes: number): string {
+    if (!bytes || bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  }
+
+  function formatSize(bytes: string | number): string {
+    const size = typeof bytes === 'string' ? parseInt(bytes) : bytes;
+    if (!size || isNaN(size)) return 'Taille inconnue';
+    
+    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    let unitIndex = 0;
+    let finalSize = size;
+    
+    while (finalSize >= 1024 && unitIndex < units.length - 1) {
+      finalSize /= 1024;
+      unitIndex++;
+    }
+    
+    return `${finalSize.toFixed(1)} ${units[unitIndex]}`;
+  }
+
+  async function addTorrent() {
+    if (!newTorrentUrl.trim()) return;
+
+    try {
+      // TODO: Implémenter l'ajout de torrent via l'API
+      alert('Fonction d\'ajout de torrent à implémenter');
+      
+      newTorrentUrl = '';
+      showAddModal = false;
+      await loadTorrents();
+    } catch (error) {
+      alert('Erreur d\'ajout: Impossible d\'ajouter le torrent');
+    }
+  }
+
+  async function deleteTorrent(id: string) {
+    if (!confirm('Êtes-vous sûr de vouloir supprimer ce torrent ?')) return;
+
+    try {
+      // TODO: Implémenter la suppression via l'API
+      alert('Fonction de suppression à implémenter');
+      await loadTorrents();
+    } catch (error) {
+      alert('Erreur de suppression: Impossible de supprimer le torrent');
+    }
+  }
+
+  async function reinsertTorrent(torrentId: string) {
+    try {
+      // TODO: Implémenter la réinsertion via l'API
+      alert('Fonction de réinsertion à implémenter');
+      await loadTorrents();
+    } catch (error) {
+      alert('Erreur de réinsertion: Impossible de réinsérer le torrent');
+    }
+  }
+
+  function formatFileSize(bytes: number): string {
+    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    let size = bytes;
+    let unitIndex = 0;
+    
+    while (size >= 1024 && unitIndex < units.length - 1) {
+      size /= 1024;
+      unitIndex++;
+    }
+    
+    return `${size.toFixed(1)} ${units[unitIndex]}`;
+  }
+</script>
+
+<svelte:head>
+  <title>Torrents - Redriva</title>
+</svelte:head>
+
+<div class="space-y-6">
+  <div class="flex items-center justify-between">
+    <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Gestion des Torrents</h1>
+    <div class="flex items-center space-x-2">
+      <!-- Bouton de rafraîchissement -->
+      <button
+        on:click={refreshTorrents}
+        disabled={refreshing}
+        class="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        title="Rafraîchir le cache des torrents"
+      >
+        <RefreshCw class="w-4 h-4 {refreshing ? 'animate-spin' : ''}" />
+        <span>{refreshing ? 'Rafraîchissement...' : 'Actualiser'}</span>
+      </button>
+      
+      <!-- Bouton d'ajout -->
+      <button
+        on:click={() => showAddModal = true}
+        class="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+      >
+        <Plus class="w-4 h-4" />
+        <span>Ajouter un torrent</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Header avec recherche et contrôles -->
+  <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
+      <!-- Recherche -->
+      <div class="flex items-center space-x-4">
+        <div class="relative">
+          <Search class="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+          <input
+            type="text"
+            placeholder="Rechercher un torrent..."
+            bind:value={searchTerm}
+            on:input={handleSearch}
+            class="pl-10 pr-4 py-2 w-64 border border-gray-300 dark:border-gray-600 rounded-lg
+                   bg-white dark:bg-gray-700 text-gray-900 dark:text-white
+                   focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          />
+        </div>
+        
+        <!-- Bouton actualiser -->
+        <button
+          on:click={loadTorrents}
+          class="w-10 h-10 bg-blue-600 hover:bg-blue-700 text-white rounded-lg
+                 flex items-center justify-center transition-colors duration-200"
+          title="Actualiser"
+        >
+          <RefreshCw class="w-4 h-4" />
+        </button>
+      </div>
+
+      <!-- Contrôles de pagination -->
+      <div class="flex items-center space-x-4">
+        <!-- Informations de cache -->
+        {#if cacheInfo}
+        <div class="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">
+          Cache: {cacheInfo.valid_entries} entrées
+          {#if cacheInfo.last_update}
+            • Mis à jour: {new Date(cacheInfo.last_update).toLocaleTimeString('fr-FR')}
+          {/if}
+        </div>
+        {/if}
+        
+        <span class="text-sm text-gray-600 dark:text-gray-400">
+          {filteredTorrents.length} torrent{filteredTorrents.length > 1 ? 's' : ''}
+        </span>
+        
+        <div class="flex items-center space-x-2">
+          <label for="torrentsPerPage" class="text-sm text-gray-600 dark:text-gray-400">
+            Par page:
+          </label>
+          <select
+            id="torrentsPerPage"
+            bind:value={torrentsPerPage}
+            on:change={() => changeTorrentsPerPage(torrentsPerPage)}
+            class="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded
+                   bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm
+                   focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          >
+            <option value={25}>25</option>
+            <option value={50}>50</option>
+            <option value={100}>100</option>
+            <option value={250}>250</option>
+            <option value={500}>500</option>
+            <option value={1000}>1000</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {#if isLoading}
+    <div class="flex items-center justify-center py-12">
+      <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      <span class="ml-2 text-gray-600 dark:text-gray-400">Chargement...</span>
+    </div>
+  {:else}
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+      {#if hasData}
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+            <thead class="bg-gray-50 dark:bg-gray-700">
+              <tr>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                  <button 
+                    on:click={() => handleSort('original_filename')}
+                    class="flex items-center space-x-1 hover:text-gray-700 dark:hover:text-gray-100"
+                  >
+                    <span>Nom</span>
+                    {#if sortField === 'original_filename'}
+                      {#if sortDirection === 'asc'}
+                        <ChevronUp class="w-4 h-4" />
+                      {:else}
+                        <ChevronDown class="w-4 h-4" />
+                      {/if}
+                    {/if}
+                  </button>
+                </th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                  <button 
+                    on:click={() => handleSort('bytes')}
+                    class="flex items-center space-x-1 hover:text-gray-700 dark:hover:text-gray-100"
+                  >
+                    <span>Taille</span>
+                    {#if sortField === 'bytes'}
+                      {#if sortDirection === 'asc'}
+                        <ChevronUp class="w-4 h-4" />
+                      {:else}
+                        <ChevronDown class="w-4 h-4" />
+                      {/if}
+                    {/if}
+                  </button>
+                </th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                  <button 
+                    on:click={() => handleSort('status')}
+                    class="flex items-center space-x-1 hover:text-gray-700 dark:hover:text-gray-100"
+                  >
+                    <span>Statut</span>
+                    {#if sortField === 'status'}
+                      {#if sortDirection === 'asc'}
+                        <ChevronUp class="w-4 h-4" />
+                      {:else}
+                        <ChevronDown class="w-4 h-4" />
+                      {/if}
+                    {/if}
+                  </button>
+                </th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                  <button 
+                    on:click={() => handleSort('addedAt')}
+                    class="flex items-center space-x-1 hover:text-gray-700 dark:hover:text-gray-100"
+                  >
+                    <span>Date ajout</span>
+                    {#if sortField === 'addedAt'}
+                      {#if sortDirection === 'asc'}
+                        <ChevronUp class="w-4 h-4" />
+                      {:else}
+                        <ChevronDown class="w-4 h-4" />
+                      {/if}
+                    {/if}
+                  </button>
+                </th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+              {#each paginatedTorrents as torrent}
+                <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
+                  <td class="px-6 py-4">
+                    <div class="max-w-xs">
+                      <div class="text-sm font-medium text-gray-900 dark:text-white truncate">
+                        {torrent.original_filename || 'Nom non disponible'}
+                      </div>
+                      <div class="text-xs text-gray-500 dark:text-gray-400 truncate">
+                        Host: {torrent.host || 'Inconnu'}
+                      </div>
+                    </div>
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                    {formatSize(torrent.bytes)}
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap">
+                    <span class="inline-flex px-2 py-1 text-xs font-medium rounded-full
+                      {torrent.status === 'downloaded' || torrent.status === 'completed' 
+                        ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+                        : torrent.status === 'downloading' 
+                        ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400'
+                        : torrent.status === 'error'
+                        ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
+                        : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'}">
+                      {torrent.status}
+                    </span>
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                    {formatDate(torrent.addedAt)}
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="flex items-center space-x-2">
+                      <button
+                        on:click={() => reinsertTorrent(torrent.hash)}
+                        class="w-8 h-8 bg-green-600 hover:bg-green-700 text-white rounded-lg
+                               flex items-center justify-center transition-colors duration-200"
+                        title="Réinsérer"
+                      >
+                        <RotateCcw class="w-4 h-4" />
+                      </button>
+                      <button
+                        on:click={() => deleteTorrent(torrent.hash)}
+                        class="w-8 h-8 bg-red-600 hover:bg-red-700 text-white rounded-lg
+                               flex items-center justify-center transition-colors duration-200"
+                        title="Supprimer"
+                      >
+                        <Trash2 class="w-4 h-4" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Pagination -->
+        {#if totalPages > 1}
+          <div class="bg-white dark:bg-gray-800 px-4 py-3 border-t border-gray-200 dark:border-gray-700">
+            <div class="flex items-center justify-between">
+              <div class="text-sm text-gray-700 dark:text-gray-300">
+                Page {currentPage} sur {totalPages} 
+                ({(currentPage - 1) * torrentsPerPage + 1}-{Math.min(currentPage * torrentsPerPage, filteredTorrents.length)} sur {filteredTorrents.length})
+              </div>
+              
+              <div class="flex items-center space-x-2">
+                <button
+                  on:click={() => changePage(1)}
+                  disabled={currentPage === 1}
+                  class="px-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded
+                         bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300
+                         hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  ≪
+                </button>
+                
+                <button
+                  on:click={() => changePage(currentPage - 1)}
+                  disabled={currentPage === 1}
+                  class="px-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded
+                         bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300
+                         hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  ‹
+                </button>
+
+                <!-- Pages numérotées -->
+                {#each Array.from({length: Math.min(5, totalPages)}, (_, i) => {
+                  const start = Math.max(1, Math.min(currentPage - 2, totalPages - 4));
+                  return start + i;
+                }) as page}
+                  <button
+                    on:click={() => changePage(page)}
+                    class="px-3 py-1 text-sm border rounded
+                           {currentPage === page 
+                             ? 'bg-blue-600 border-blue-600 text-white' 
+                             : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600'}"
+                  >
+                    {page}
+                  </button>
+                {/each}
+
+                <button
+                  on:click={() => changePage(currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                  class="px-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded
+                         bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300
+                         hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  ›
+                </button>
+                
+                <button
+                  on:click={() => changePage(totalPages)}
+                  disabled={currentPage === totalPages}
+                  class="px-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded
+                         bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300
+                         hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  ≫
+                </button>
+              </div>
+            </div>
+          </div>
+        {/if}
+      {:else}
+        <div class="text-center py-12">
+          <Download class="w-12 h-12 text-gray-400 mx-auto mb-4" />
+          <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2">
+            {searchTerm.trim() ? 'Aucun torrent trouvé' : 'Aucun torrent'}
+          </h3>
+          <p class="text-gray-500 dark:text-gray-400 mb-4">
+            {searchTerm.trim() 
+              ? `Aucun résultat pour "${searchTerm}"`
+              : 'Commencez par ajouter votre premier torrent'}
+          </p>
+          {#if !searchTerm.trim()}
+            <button
+              on:click={() => showAddModal = true}
+              class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Ajouter un torrent
+            </button>
+          {/if}
+        </div>
+      {/if}
+    </div>
+  {/if}
+</div>
+
+<!-- Modal d'ajout de torrent -->
+{#if showAddModal}
+  <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
+      <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Ajouter un torrent</h2>
+      
+      <div class="space-y-4">
+        <div>
+          <label for="torrent-url" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            URL Magnet ou lien torrent
+          </label>
+          <input
+            id="torrent-url"
+            type="text"
+            bind:value={newTorrentUrl}
+            placeholder="magnet:?xt=urn:btih:..."
+            class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg 
+                   bg-white dark:bg-gray-700 text-gray-900 dark:text-white
+                   focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          />
+        </div>
+      </div>
+
+      <div class="flex justify-end space-x-3 mt-6">
+        <button
+          on:click={() => { showAddModal = false; newTorrentUrl = ''; }}
+          class="px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 
+                 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+        >
+          Annuler
+        </button>
+        <button
+          on:click={addTorrent}
+          disabled={!newTorrentUrl.trim()}
+          class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 
+                 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          Ajouter
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}

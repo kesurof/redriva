@@ -1,9 +1,7 @@
-<<script lang="ts">
+<script lang="ts">
   import { onMount } from 'svelte';
-  import { Activity, Download, Server, Clock } from 'lucide-svelte';
-  import { torrentService } from '$lib/api/torrents';
-  import { servicesService } from '$lib/api/services';
-  import { addNotification } from '$lib/stores/notifications';
+  import { Activity, Download, Server, Clock, RefreshCw, Trash2, RotateCcw, Search, ChevronUp, ChevronDown, HardDrive, Signal, ExternalLink, Copy } from 'lucide-svelte';
+  import api from '$lib/api/client';
 
   let stats = {
     totalTorrents: 0,
@@ -12,34 +10,177 @@
     servicesOnline: 0
   };
 
-  let recentTorrents: any[] = [];
+  let data = { torrents: [] };
+  let filteredTorrents: any[] = [];
   let loading = true;
+  let lastUpdate = new Date();
+  let searchTerm = '';
+  let sortField = 'addedAt';
+  let sortDirection = 'desc';
 
-  onMount(async () => {
+  async function loadData() {
     try {
-      // Charger les statistiques
-      const [torrents, services] = await Promise.all([
-        torrentService.getAll(),
-        servicesService.getStatus()
-      ]);
-
+      loading = true;
+      // Charger les vrais torrents récents depuis l'API (même endpoint que la page torrents)
+      const response = await api.get('/torrents?limit=25');
+      
+      // L'API retourne un format RDM avec {success, data, error, meta}
+      if (response.success) {
+        data.torrents = response.data || [];
+      } else {
+        throw new Error(response.error || 'Erreur lors du chargement');
+      }
+      
+      // Calculer les statistiques à partir des vrais données
       stats = {
-        totalTorrents: torrents.length,
-        activeTorrents: torrents.filter(t => t.status === 'downloading').length,
-        completedTorrents: torrents.filter(t => t.status === 'completed').length,
-        servicesOnline: services.filter(s => s.status === 'online').length
+        totalTorrents: data.torrents.length,
+        activeTorrents: data.torrents.filter(t => t.status === 'downloading').length,
+        completedTorrents: data.torrents.filter(t => t.status === 'downloaded' || t.status === 'completed').length,
+        servicesOnline: 7 // Nombre de services configurés
       };
-
-      recentTorrents = torrents.slice(0, 5);
+      
+      lastUpdate = new Date();
     } catch (error) {
-      addNotification({
-        type: 'error',
-        title: 'Erreur de chargement',
-        message: 'Impossible de charger les données du dashboard'
-      });
+      console.error('Erreur lors du chargement des données:', error);
+      // Utiliser des données par défaut en cas d'erreur
+      data.torrents = [];
+      stats = {
+        totalTorrents: 0,
+        activeTorrents: 0,
+        completedTorrents: 0,
+        servicesOnline: 0
+      };
     } finally {
       loading = false;
     }
+  }
+
+  // Gestion de la recherche
+  function handleSearch() {
+    // La recherche est automatiquement réactive avec filteredTorrents
+  }
+  
+  // Gestion du tri
+  function handleSort(field) {
+    if (sortField === field) {
+      sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+    } else {
+      sortField = field;
+      sortDirection = 'asc';
+    }
+  }
+
+  // Fonction pour trier les torrents
+  function sortTorrents(torrents) {
+    return [...torrents].sort((a, b) => {
+      let aVal = a[sortField];
+      let bVal = b[sortField];
+      
+      // Gestion spéciale pour les noms (support des différents formats)
+      if (sortField === 'original_filename') {
+        aVal = a.filename || a.original_filename || a.name || '';
+        bVal = b.filename || b.original_filename || b.name || '';
+      }
+      
+      // Gestion spéciale pour les dates (support des différents formats)
+      if (sortField === 'addedAt') {
+        aVal = new Date(a.added || a.addedAt);
+        bVal = new Date(b.added || b.addedAt);
+      }
+      
+      // Gestion spéciale pour les tailles (support des différents formats)
+      if (sortField === 'bytes') {
+        aVal = parseInt(a.size || a.bytes || 0);
+        bVal = parseInt(b.size || b.bytes || 0);
+      }
+      
+      // Gestion des chaînes
+      if (typeof aVal === 'string' && typeof bVal === 'string') {
+        aVal = aVal.toLowerCase();
+        bVal = bVal.toLowerCase();
+      }
+      
+      if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }
+  
+  // Filtrage et tri réactifs
+  $: filteredTorrents = sortTorrents(
+    data.torrents.filter(torrent =>
+      !searchTerm.trim() || 
+      (torrent.filename || torrent.original_filename || torrent.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (torrent.host || 'Real-Debrid').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (torrent.status || '').toLowerCase().includes(searchTerm.toLowerCase())
+    )
+  );
+
+  // Fonctions utilitaires
+  function formatDate(dateString: string): string {
+    try {
+      if (!dateString) return 'Date inconnue';
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return 'Date invalide';
+      return date.toLocaleDateString('fr-FR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch (error) {
+      return 'Date invalide';
+    }
+  }
+
+  function formatBytes(bytes: string | number): string {
+    const size = typeof bytes === 'string' ? parseInt(bytes) : bytes;
+    if (!size || isNaN(size)) return '0 B';
+    
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(size) / Math.log(k));
+    return parseFloat((size / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  }
+
+  // Fonction pour obtenir la couleur du statut
+  function getStatusColor(status: string): string {
+    switch (status?.toLowerCase()) {
+      case 'downloaded':
+      case 'completed':
+      case 'terminé':
+        return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
+      case 'downloading':
+      case 'en cours':
+        return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';
+      case 'waiting':
+      case 'en attente':
+        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200';
+      case 'error':
+      case 'erreur':
+        return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
+      default:
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200';
+    }
+  }
+
+  // Fonction pour copier l'ID dans le presse-papiers
+  async function copyToClipboard(text: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch (err) {
+      console.error('Erreur lors de la copie:', err);
+    }
+  }
+
+  // Fonction pour ouvrir un lien
+  function openLink(url: string) {
+    window.open(url, '_blank', 'noopener,noreferrer');
+  }
+
+  onMount(() => {
+    loadData();
   });
 </script>
 
@@ -51,7 +192,7 @@
   <div class="flex items-center justify-between">
     <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
     <div class="text-sm text-gray-500 dark:text-gray-400">
-      Dernière mise à jour: {new Date().toLocaleTimeString('fr-FR')}
+      Dernière mise à jour: {lastUpdate.toLocaleTimeString('fr-FR')}
     </div>
   </div>
 
@@ -111,42 +252,137 @@
       </div>
     </div>
 
-    <!-- Torrents récents -->
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow">
-      <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-        <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Torrents récents</h2>
+    <!-- Header avec recherche et bouton actualiser -->
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+      <div class="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
+        <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Torrents Récents</h2>
+        
+        <div class="flex items-center space-x-4">
+          <!-- Recherche -->
+          <div class="relative">
+            <Search class="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+            <input
+              type="text"
+              placeholder="Rechercher un torrent..."
+              bind:value={searchTerm}
+              on:input={handleSearch}
+              class="pl-10 pr-4 py-2 w-64 border border-gray-300 dark:border-gray-600 rounded-lg
+                     bg-white dark:bg-gray-700 text-gray-900 dark:text-white
+                     focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            />
+          </div>
+          
+          <!-- Bouton actualiser -->
+          <button
+            on:click={loadData}
+            class="w-10 h-10 bg-blue-600 hover:bg-blue-700 text-white rounded-lg
+                   flex items-center justify-center transition-colors duration-200"
+            title="Actualiser"
+            aria-label="Actualiser la liste des torrents"
+          >
+            <RefreshCw class="w-4 h-4" />
+          </button>
+        </div>
       </div>
-      <div class="p-6">
-        {#if recentTorrents.length > 0}
-          <div class="space-y-4">
-            {#each recentTorrents as torrent}
-              <div class="flex items-center justify-between py-3 border-b border-gray-100 dark:border-gray-700 last:border-b-0">
-                <div class="flex-1 min-w-0">
-                  <p class="text-sm font-medium text-gray-900 dark:text-white truncate">
-                    {torrent.name}
-                  </p>
-                  <p class="text-sm text-gray-500 dark:text-gray-400">
-                    {torrent.addedAt}
-                  </p>
-                </div>
-                <div class="ml-4 flex items-center">
-                  <span class="px-2 py-1 text-xs font-medium rounded-full
-                    {torrent.status === 'completed' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' :
-                      torrent.status === 'downloading' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300' :
-                      torrent.status === 'error' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300' :
-                      'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'}">
-                    {torrent.status}
-                  </span>
+    </div>
+
+    <!-- Liste des torrents récents en cartes modernes -->
+    <div class="space-y-3">
+      {#if filteredTorrents.length > 0}
+        {#each filteredTorrents as torrent}
+          <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 hover:shadow-md transition-shadow duration-200">
+            <div class="flex items-center justify-between">
+              <!-- Informations principales (première ligne) -->
+              <div class="flex-1 min-w-0 pr-4">
+                <div class="flex items-center space-x-3">
+                  <div class="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                    <HardDrive class="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <h3 class="text-sm font-medium text-gray-900 dark:text-white truncate">
+                      {torrent.filename || torrent.original_filename || torrent.name || 'Nom non disponible'}
+                    </h3>
+                    <!-- Métadonnées (deuxième ligne) -->
+                    <div class="flex items-center space-x-4 mt-1 text-xs text-gray-500 dark:text-gray-400">
+                      <span class="flex items-center space-x-1">
+                        <Signal class="w-3 h-3" />
+                        <span>{formatBytes(torrent.size || torrent.bytes || 0)}</span>
+                      </span>
+                      <span class="flex items-center space-x-1">
+                        <Clock class="w-3 h-3" />
+                        <span>{new Date(torrent.added || torrent.addedAt).toLocaleDateString('fr-FR')}</span>
+                      </span>
+                      <span class="flex items-center space-x-1">
+                        <span>Host: {torrent.host || 'Real-Debrid'}</span>
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </div>
-            {/each}
+              
+              <!-- Badge de statut et actions -->
+              <div class="flex items-center space-x-3">
+                <!-- Badge de statut -->
+                <span class="inline-flex px-2 py-1 text-xs font-medium rounded-full {getStatusColor(torrent.status)}">
+                  {torrent.status}
+                </span>
+                
+                <!-- Actions -->
+                <div class="flex items-center space-x-2">
+                  {#if torrent.links && torrent.links.length > 0}
+                    <button
+                      on:click={() => copyToClipboard(torrent.links[0])}
+                      class="w-8 h-8 bg-blue-600 hover:bg-blue-700 text-white rounded-lg
+                             flex items-center justify-center transition-colors duration-200"
+                      title="Copier le lien"
+                      aria-label="Copier le lien de téléchargement"
+                    >
+                      <Copy class="w-4 h-4" />
+                    </button>
+                    <button
+                      on:click={() => openLink(torrent.links[0])}
+                      class="w-8 h-8 bg-green-600 hover:bg-green-700 text-white rounded-lg
+                             flex items-center justify-center transition-colors duration-200"
+                      title="Ouvrir le lien"
+                      aria-label="Ouvrir le lien dans un nouvel onglet"
+                    >
+                      <ExternalLink class="w-4 h-4" />
+                    </button>
+                  {/if}
+                  <button
+                    class="w-8 h-8 bg-orange-600 hover:bg-orange-700 text-white rounded-lg
+                           flex items-center justify-center transition-colors duration-200"
+                    title="Réinsérer"
+                    aria-label="Réinsérer le torrent"
+                  >
+                    <RotateCcw class="w-4 h-4" />
+                  </button>
+                  <button
+                    class="w-8 h-8 bg-red-600 hover:bg-red-700 text-white rounded-lg
+                           flex items-center justify-center transition-colors duration-200"
+                    title="Supprimer"
+                    aria-label="Supprimer le torrent"
+                  >
+                    <Trash2 class="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
-        {:else}
-          <p class="text-gray-500 dark:text-gray-400 text-center py-8">
-            Aucun torrent récent
+        {/each}
+      {:else}
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-12 text-center">
+          <Download class="w-12 h-12 text-gray-400 mx-auto mb-4" />
+          <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2">
+            {searchTerm.trim() ? 'Aucun torrent trouvé' : 'Aucun torrent récent'}
+          </h3>
+          <p class="text-gray-500 dark:text-gray-400">
+            {searchTerm.trim() 
+              ? `Aucun résultat pour "${searchTerm}"`
+              : 'Les torrents récents apparaîtront ici'}
           </p>
-        {/if}
-      </div>
+        </div>
+      {/if}
     </div>
   {/if}
 </div>

@@ -1,0 +1,437 @@
+<script lang="ts">
+  import { onMount } from 'svelte';
+  import { Activity, Download, Server, Clock, RefreshCw, Trash2, RotateCcw, Search, ChevronUp, ChevronDown } from 'lucide-svelte';
+  import { torrentService } from '$lib/api/torrents';
+  import { servicesService } from '$lib/api/services';
+  import api from '$lib/api/client';
+
+  let stats = {
+    totalTorrents: 0,
+    activeTorrents: 0,
+    completedTorrents: 0,
+    servicesOnline: 0
+  };
+
+  let recentTorrents: any[] = [];
+  let filteredTorrents: any[] = [];
+  let loading = true;
+  let lastUpdate = new Date();
+  let searchTerm = '';
+  let sortField = 'addedAt';
+  let sortDirection = 'desc';
+
+  async function loadData() {
+    try {
+      // Charger les vrais torrents récents depuis l'API
+      const response = await api.get('/torrents/recent?limit=25');
+      recentTorrents = response || [];
+      
+      // Calculer les statistiques à partir des vrais données
+      stats = {
+        totalTorrents: recentTorrents.length,
+        activeTorrents: recentTorrents.filter(t => t.status === 'downloading').length,
+        completedTorrents: recentTorrents.filter(t => t.status === 'downloaded' || t.status === 'completed').length,
+        servicesOnline: 7 // Nombre de services configurés
+      };
+      
+      // Appliquer le tri et la recherche
+      applyFiltersAndSort();
+      
+      lastUpdate = new Date();
+    } catch (error) {
+      console.error('Erreur lors du chargement des données:', error);
+      // Utiliser des données par défaut en cas d'erreur
+      recentTorrents = [];
+      filteredTorrents = [];
+      stats = {
+        totalTorrents: 0,
+        activeTorrents: 0,
+        completedTorrents: 0,
+        servicesOnline: 0
+      };
+    }
+  }
+
+  function applyFiltersAndSort() {
+    let filtered = recentTorrents;
+    
+    // Appliquer la recherche
+    if (searchTerm.trim()) {
+      filtered = filtered.filter(torrent => 
+        torrent.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        torrent.status.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+    
+    // Appliquer le tri
+    filtered.sort((a, b) => {
+      let valueA = a[sortField];
+      let valueB = b[sortField];
+      
+      // Gestion spéciale pour les dates
+      if (sortField === 'addedAt' || sortField === 'ended') {
+        valueA = new Date(valueA).getTime();
+        valueB = new Date(valueB).getTime();
+      }
+      
+      // Gestion spéciale pour la taille
+      if (sortField === 'size') {
+        valueA = Number(valueA) || 0;
+        valueB = Number(valueB) || 0;
+      }
+      
+      if (sortDirection === 'asc') {
+        return valueA > valueB ? 1 : -1;
+      } else {
+        return valueA < valueB ? 1 : -1;
+      }
+    });
+    
+    filteredTorrents = filtered;
+  }
+
+  function handleSort(field: string) {
+    if (sortField === field) {
+      sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+    } else {
+      sortField = field;
+      sortDirection = 'desc';
+    }
+    applyFiltersAndSort();
+  }
+
+  // Réactif pour la recherche
+  $: if (searchTerm !== undefined) {
+    applyFiltersAndSort();
+  }
+
+  async function refresh() {
+    loading = true;
+    await loadData();
+    loading = false;
+  }
+
+  async function deleteTorrent(torrentId: string, torrentName: string) {
+    if (confirm(`Êtes-vous sûr de vouloir supprimer "${torrentName}" ?`)) {
+      try {
+        await api.delete(`/torrents/${torrentId}`);
+        alert('Torrent supprimé avec succès !');
+        await refresh(); // Recharger la liste
+      } catch (error) {
+        console.error('Erreur lors de la suppression:', error);
+        alert('Erreur lors de la suppression du torrent');
+      }
+    }
+  }
+
+  async function reinsertTorrent(torrentId: string, torrentName: string) {
+    try {
+      await api.post(`/torrents/${torrentId}/reinsert`);
+      alert('Torrent réinséré avec succès !');
+      await refresh(); // Recharger la liste
+    } catch (error) {
+      console.error('Erreur lors de la réinsertion:', error);
+      alert('Erreur lors de la réinsertion du torrent');
+    }
+  }
+
+  function formatFileSize(bytes: number): string {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+  }
+
+  function formatDate(dateString: string): string {
+    if (!dateString) return 'N/A';
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return 'Date invalide';
+      return date.toLocaleDateString('fr-FR') + ' à ' + date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+    } catch (error) {
+      return 'Date invalide';
+    }
+  }
+
+  function formatDateShort(dateString: string): string {
+    if (!dateString) return 'N/A';
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return 'N/A';
+      return date.toLocaleDateString('fr-FR');
+    } catch (error) {
+      return 'N/A';
+    }
+  }
+
+  function getStatusColor(status: string): string {
+    switch (status) {
+      case 'downloaded':
+      case 'completed':
+        return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300';
+      case 'downloading':
+      case 'magnet_conversion':
+        return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300';
+      case 'error':
+        return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300';
+      case 'waiting':
+        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300';
+      default:
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
+    }
+  }
+
+  onMount(async () => {
+    await loadData();
+    loading = false;
+  });
+</script>
+
+<svelte:head>
+  <title>Dashboard - Redriva</title>
+</svelte:head>
+
+<div class="space-y-6">
+  <div class="flex items-center justify-between">
+    <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
+    <div class="flex items-center space-x-4">
+      <!-- Champ de recherche -->
+      <div class="relative">
+        <Search class="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+        <input
+          type="text"
+          bind:value={searchTerm}
+          placeholder="Rechercher des torrents..."
+          class="pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 w-64"
+        />
+      </div>
+      
+      <!-- Bouton Refresh dans un carré arrondi -->
+      <button
+        on:click={refresh}
+        disabled={loading}
+        class="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+        title="Actualiser les données"
+      >
+        <RefreshCw class="w-4 h-4 {loading ? 'animate-spin' : ''}" />
+      </button>
+      
+      <div class="text-sm text-gray-500 dark:text-gray-400">
+        Dernière mise à jour: {lastUpdate.toLocaleTimeString('fr-FR')}
+      </div>
+    </div>
+  </div>
+
+  {#if loading}
+    <div class="flex items-center justify-center py-12">
+      <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+    </div>
+  {:else}
+    <!-- Statistiques -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
+        <div class="flex items-center">
+          <div class="p-3 bg-blue-100 dark:bg-blue-900 rounded-full">
+            <Download class="w-6 h-6 text-blue-600 dark:text-blue-400" />
+          </div>
+          <div class="ml-4">
+            <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Total Torrents</p>
+            <p class="text-2xl font-semibold text-gray-900 dark:text-white">{stats.totalTorrents}</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
+        <div class="flex items-center">
+          <div class="p-3 bg-green-100 dark:bg-green-900 rounded-full">
+            <Activity class="w-6 h-6 text-green-600 dark:text-green-400" />
+          </div>
+          <div class="ml-4">
+            <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Actifs</p>
+            <p class="text-2xl font-semibold text-gray-900 dark:text-white">{stats.activeTorrents}</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
+        <div class="flex items-center">
+          <div class="p-3 bg-purple-100 dark:bg-purple-900 rounded-full">
+            <Clock class="w-6 h-6 text-purple-600 dark:text-purple-400" />
+          </div>
+          <div class="ml-4">
+            <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Terminés</p>
+            <p class="text-2xl font-semibold text-gray-900 dark:text-white">{stats.completedTorrents}</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
+        <div class="flex items-center">
+          <div class="p-3 bg-orange-100 dark:bg-orange-900 rounded-full">
+            <Server class="w-6 h-6 text-orange-600 dark:text-orange-400" />
+          </div>
+          <div class="ml-4">
+            <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Services OK</p>
+            <p class="text-2xl font-semibold text-gray-900 dark:text-white">{stats.servicesOnline}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Torrents récents -->
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow">
+      <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+        <div class="flex items-center justify-between">
+          <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Torrents récents</h2>
+          <div class="text-sm text-gray-500 dark:text-gray-400">
+            {filteredTorrents.length} torrent{filteredTorrents.length > 1 ? 's' : ''} affiché{filteredTorrents.length > 1 ? 's' : ''}
+          </div>
+        </div>
+        
+        <!-- En-têtes de tri -->
+        <div class="flex items-center space-x-4 mt-3 text-xs font-medium text-gray-500 dark:text-gray-400">
+          <button
+            on:click={() => handleSort('name')}
+            class="flex items-center space-x-1 hover:text-gray-700 dark:hover:text-gray-300"
+          >
+            <span>Nom</span>
+            {#if sortField === 'name'}
+              {#if sortDirection === 'asc'}
+                <ChevronUp class="w-3 h-3" />
+              {:else}
+                <ChevronDown class="w-3 h-3" />
+              {/if}
+            {/if}
+          </button>
+          
+          <button
+            on:click={() => handleSort('addedAt')}
+            class="flex items-center space-x-1 hover:text-gray-700 dark:hover:text-gray-300"
+          >
+            <span>Date d'ajout</span>
+            {#if sortField === 'addedAt'}
+              {#if sortDirection === 'asc'}
+                <ChevronUp class="w-3 h-3" />
+              {:else}
+                <ChevronDown class="w-3 h-3" />
+              {/if}
+            {/if}
+          </button>
+          
+          <button
+            on:click={() => handleSort('size')}
+            class="flex items-center space-x-1 hover:text-gray-700 dark:hover:text-gray-300"
+          >
+            <span>Taille</span>
+            {#if sortField === 'size'}
+              {#if sortDirection === 'asc'}
+                <ChevronUp class="w-3 h-3" />
+              {:else}
+                <ChevronDown class="w-3 h-3" />
+              {/if}
+            {/if}
+          </button>
+          
+          <button
+            on:click={() => handleSort('status')}
+            class="flex items-center space-x-1 hover:text-gray-700 dark:hover:text-gray-300"
+          >
+            <span>Statut</span>
+            {#if sortField === 'status'}
+              {#if sortDirection === 'asc'}
+                <ChevronUp class="w-3 h-3" />
+              {:else}
+                <ChevronDown class="w-3 h-3" />
+              {/if}
+            {/if}
+          </button>
+        </div>
+      </div>
+      
+      <div class="p-6">
+        {#if filteredTorrents.length > 0}
+          <div class="space-y-4">
+            {#each filteredTorrents as torrent}
+              <div class="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                <!-- Première ligne : Nom du torrent et boutons -->
+                <div class="flex items-start justify-between mb-2">
+                  <div class="flex-1 min-w-0">
+                    <h3 class="text-sm font-medium text-gray-900 dark:text-white truncate">
+                      {torrent.name}
+                    </h3>
+                  </div>
+                  <div class="flex items-center space-x-2 ml-4">
+                    <span class="px-2 py-1 text-xs font-medium rounded-full {getStatusColor(torrent.status)}">
+                      {torrent.status}
+                    </span>
+                    <!-- Bouton Réinsérer dans un carré arrondi -->
+                    <button
+                      on:click={() => reinsertTorrent(torrent.id, torrent.name)}
+                      class="p-1.5 bg-blue-100 text-blue-600 hover:bg-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:hover:bg-blue-900/40 rounded-lg transition-colors"
+                      title="Réinsérer le torrent"
+                    >
+                      <RotateCcw class="w-4 h-4" />
+                    </button>
+                    <!-- Bouton Supprimer dans un carré arrondi -->
+                    <button
+                      on:click={() => deleteTorrent(torrent.id, torrent.name)}
+                      class="p-1.5 bg-red-100 text-red-600 hover:bg-red-200 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/40 rounded-lg transition-colors"
+                      title="Supprimer le torrent"
+                    >
+                      <Trash2 class="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+                
+                <!-- Deuxième ligne : Informations détaillées -->
+                <div class="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+                  <div class="flex items-center space-x-4">
+                    <span>
+                      Ajouté: {formatDate(torrent.addedAt)}
+                    </span>
+                    {#if torrent.size}
+                      <span>
+                        Taille: {formatFileSize(torrent.size)}
+                      </span>
+                    {/if}
+                    {#if torrent.progress !== undefined}
+                      <span>
+                        Progression: {torrent.progress}%
+                      </span>
+                    {/if}
+                    {#if torrent.host}
+                      <span>
+                        Host: {torrent.host}
+                      </span>
+                    {/if}
+                  </div>
+                  <div class="flex items-center space-x-2">
+                    {#if torrent.ended && torrent.ended !== torrent.addedAt}
+                      <span>
+                        Terminé: {formatDateShort(torrent.ended)}
+                      </span>
+                    {/if}
+                    {#if torrent.split > 0}
+                      <span class="bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded text-xs">
+                        Split: {torrent.split}MB
+                      </span>
+                    {/if}
+                  </div>
+                </div>
+              </div>
+            {/each}
+          </div>
+        {:else if searchTerm}
+          <p class="text-gray-500 dark:text-gray-400 text-center py-8">
+            Aucun torrent trouvé pour "{searchTerm}"
+          </p>
+        {:else}
+          <p class="text-gray-500 dark:text-gray-400 text-center py-8">
+            Aucun torrent récent
+          </p>
+        {/if}
+      </div>
+    </div>
+  {/if}
+</div>

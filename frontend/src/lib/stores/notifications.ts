@@ -17,26 +17,8 @@ const initialState: NotificationState = {
 export const notificationStore = writable(initialState);
 
 export const addNotification = (notification: Omit<NotificationState['notifications'][0], 'id'>) => {
-  const id = Math.random().toString(36).substr(2, 9);
-  const newNotification = {
-    ...notification,
-    id,
-    duration: notification.duration || 5000
-  };
-
-  notificationStore.update(state => ({
-    ...state,
-    notifications: [...state.notifications, newNotification]
-  }));
-
-  // Auto-remove notification après la durée spécifiée
-  if (newNotification.duration > 0) {
-    setTimeout(() => {
-      removeNotification(id);
-    }, newNotification.duration);
-  }
-
-  return id;
+  // Notifications désactivées - ne fait rien
+  return '';
 };
 
 export const removeNotification = (id: string) => {

@@ -1,12 +1,11 @@
 <script lang="ts">
   import { page } from '$app/stores';
-  import { Home, Download, Settings, Activity, Palette } from 'lucide-svelte';
+  import { Home, Download, Settings, Activity } from 'lucide-svelte';
 
   const navigation = [
     { name: 'Dashboard', href: '/', icon: Home },
     { name: 'Torrents', href: '/torrents', icon: Download },
     { name: 'Services', href: '/services', icon: Activity },
-    { name: 'Thèmes', href: '/themes', icon: Palette },
     { name: 'Paramètres', href: '/settings', icon: Settings }
   ];
 

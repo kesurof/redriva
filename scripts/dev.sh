@@ -149,6 +149,39 @@ case "${1:-start}" in
         info "   $0 rebuild"
         ;;
     
+    "clear-cache")
+        SERVICE="${2:-backend}"
+        case "$SERVICE" in
+            "backend")
+                log "🧹 Effacement cache Docker - Backend"
+                docker compose stop backend
+                docker rmi redriva-backend 2>/dev/null || true
+                docker compose up --build -d backend
+                log "✅ Cache backend effacé et reconstruit"
+                ;;
+            "frontend")
+                log "🧹 Effacement cache Docker - Frontend"
+                docker compose stop frontend
+                docker rmi redriva-frontend 2>/dev/null || true
+                docker compose up --build -d frontend
+                log "✅ Cache frontend effacé et reconstruit"
+                ;;
+            "all")
+                log "🧹 Effacement cache Docker - Tous les services"
+                docker compose down
+                docker rmi redriva-backend redriva-frontend 2>/dev/null || true
+                docker system prune -f
+                docker compose up --build -d
+                log "✅ Cache de tous les services effacé"
+                ;;
+            *)
+                error "Service non reconnu: $SERVICE"
+                error "Services disponibles: backend, frontend, all"
+                exit 1
+                ;;
+        esac
+        ;;
+    
     "reset")
         log "💥 Reset complet (ATTENTION: supprime tout)"
         echo -e "${RED}⚠️  Cela va supprimer:${NC}"
