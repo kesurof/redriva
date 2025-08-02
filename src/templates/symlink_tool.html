@@ -570,6 +570,17 @@
             <h3>🗑️ Nettoyage des torrents Real-Debrid</h3>
             <p>Identifie et supprime les torrents Real-Debrid qui ne sont plus utilisés sur votre serveur.</p>
             
+            <!-- Message de sécurité -->
+            <div class="alert alert-info" style="margin-bottom: 20px;">
+                <strong>🛡️ Sécurités intégrées :</strong>
+                <ul style="margin: 10px 0 0 0; padding-left: 20px;">
+                    <li><strong>Protection automatique</strong> : Les torrents en cours de téléchargement ou en erreur ne sont jamais proposés à la suppression</li>
+                    <li><strong>Seuls les torrents terminés</strong> (statut "downloaded" ou "finished") sont candidats au nettoyage</li>
+                    <li><strong>Mode dry-run obligatoire</strong> : Analyse d'abord sans risque avant la suppression réelle</li>
+                    <li><strong>Âge minimum configurable</strong> : Protection des torrents récents (0 jour = tous les torrents terminés)</li>
+                </ul>
+            </div>
+            
             <!-- Actions -->
             <div class="cleanup-actions" style="margin-bottom: 20px; display: flex; gap: 10px;">
                 <button onclick="analyzeUnusedTorrents(true)" class="btn btn-info" id="analyze-btn">
@@ -578,6 +589,11 @@
                 <button onclick="analyzeUnusedTorrents(false)" class="btn btn-warning" id="real-analyze-btn" style="display: none;">
                     🗑️ Analyser pour suppression
                 </button>
+            </div>
+            
+            <!-- Progression des analyses longues -->
+            <div id="cleanup-progress" style="display: none; background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #dee2e6;">
+                <!-- Rempli dynamiquement par JavaScript -->
             </div>
             
             <!-- Statistiques -->
@@ -599,6 +615,7 @@
                                 <th>Âge</th>
                                 <th>Correspondance</th>
                                 <th>Statut</th>
+                                <th style="width: 8%; text-align: center;">Sécurité</th>
                             </tr>
                         </thead>
                         <tbody id="cleanup-torrents-list">
@@ -709,8 +726,8 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label>Âge minimum (jours)</label>
-                        <input type="number" class="form-control" id="cleanup-min-age" min="1" max="365" value="2">
-                        <small class="form-text text-muted">Âge minimum avant qu'un torrent puisse être supprimé</small>
+                        <input type="number" class="form-control" id="cleanup-min-age" min="0" max="365" value="0">
+                        <small class="form-text text-muted">Âge minimum avant qu'un torrent puisse être supprimé (0 = aucune limite d'âge)</small>
                     </div>
                     <div class="form-group">
                         <label>Taille minimum (MB)</label>

@@ -85,6 +85,36 @@ def init_symlink_database():
         )
     ''')
     
+    # Table pour les analyses cleanup persistantes
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS cleanup_analyses (
+            id TEXT PRIMARY KEY,
+            status TEXT CHECK(status IN ('running', 'completed', 'cancelled', 'error')),
+            start_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            end_time TIMESTAMP,
+            progress INTEGER DEFAULT 0,
+            current_step TEXT,
+            total_torrents INTEGER DEFAULT 0,
+            processed_torrents INTEGER DEFAULT 0,
+            used_torrents_count INTEGER DEFAULT 0,
+            unused_torrents_count INTEGER DEFAULT 0,
+            config_json TEXT,
+            results_json TEXT,
+            error_message TEXT,
+            user_session TEXT
+        )
+    ''')
+    
+    # Table pour les résultats temporaires (chunks)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS cleanup_temp_results (
+            analysis_id TEXT,
+            chunk_index INTEGER,
+            torrent_data TEXT,
+            FOREIGN KEY (analysis_id) REFERENCES cleanup_analyses (id)
+        )
+    ''')
+    
         # Insérer une configuration par défaut si elle n'existe pas
     cursor.execute('SELECT COUNT(*) FROM symlink_config')
     if cursor.fetchone()[0] == 0:
@@ -97,7 +127,7 @@ def init_symlink_database():
     cleanup_columns = [
         ('cleanup_enabled', 'BOOLEAN DEFAULT 0'),
         ('zurg_path', 'TEXT DEFAULT "/home/kesurof/seedbox/zurg/__all__"'),
-        ('cleanup_min_age_days', 'INTEGER DEFAULT 2'),
+        ('cleanup_min_age_days', 'INTEGER DEFAULT 0'),
         ('cleanup_min_size_mb', 'INTEGER DEFAULT 0'),
         ('organized_media_path', 'TEXT DEFAULT "/app/medias"'),
         ('cleanup_dry_run_default', 'BOOLEAN DEFAULT 1'),
@@ -293,17 +323,448 @@ class WebSymlinkChecker:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 class TorrentCleanupAnalyzer:
-    """Analyseur et nettoyeur de torrents Real-Debrid inutilisés"""
+    """Analyseur et nettoyeur de torrents Real-Debrid inutilisés - Version persistante"""
     
-    def __init__(self, config: Dict = None):
-        """Initialise l'analyseur avec la configuration"""
+    def __init__(self, config: Dict = None, analysis_id: str = None):
+        """Initialise l'analyseur avec support de persistance"""
         self.config = config or self._load_cleanup_config()
+        self.analysis_id = analysis_id or self._generate_analysis_id()
         self.zurg_path = self.config.get('zurg_path', '/home/kesurof/seedbox/zurg/__all__')
-        self.min_age_days = self.config.get('cleanup_min_age_days', 2)
+        self.min_age_days = self.config.get('cleanup_min_age_days', 0)
         self.min_size_mb = self.config.get('cleanup_min_size_mb', 0)
         self.organized_media_path = self.config.get('organized_media_path', '/app/medias')
         self.match_threshold = self.config.get('cleanup_match_threshold', 80)
         self.detailed_logs = self.config.get('cleanup_detailed_logs', False)
+        
+        # État de progression
+        self.should_stop = False
+        self.progress_callback = None
+    
+    def _generate_analysis_id(self) -> str:
+        """Génère un ID unique pour l'analyse"""
+        import uuid
+        return f"cleanup_{int(time.time())}_{str(uuid.uuid4())[:8]}"
+    
+    def start_analysis_async(self, user_session: str = None) -> str:
+        """Lance l'analyse en arrière-plan avec persistance"""
+        try:
+            # Créer l'enregistrement d'analyse
+            self._create_analysis_record(user_session)
+            
+            # Lancer en thread séparé
+            import threading
+            thread = threading.Thread(
+                target=self._execute_persistent_analysis,
+                daemon=True
+            )
+            thread.start()
+            
+            logger.info(f"Analyse cleanup {self.analysis_id} démarrée en arrière-plan")
+            return self.analysis_id
+            
+        except Exception as e:
+            logger.error(f"Erreur démarrage analyse: {e}")
+            self._update_analysis_status('error', error_message=str(e))
+            raise
+    
+    def _create_analysis_record(self, user_session: str):
+        """Crée l'enregistrement initial de l'analyse"""
+        try:
+            with sqlite3.connect(SYMLINK_DB_PATH) as conn:
+                c = conn.cursor()
+                c.execute('''
+                    INSERT INTO cleanup_analyses (
+                        id, status, config_json, user_session, current_step
+                    ) VALUES (?, 'running', ?, ?, 'Initialisation...')
+                ''', (
+                    self.analysis_id,
+                    json.dumps(self.config),
+                    user_session
+                ))
+                conn.commit()
+                
+        except Exception as e:
+            logger.error(f"Erreur création enregistrement analyse: {e}")
+            raise
+    
+    def _execute_persistent_analysis(self):
+        """Exécute l'analyse avec sauvegarde des résultats au fur et à mesure"""
+        try:
+            # Étape 1 : Scan Zurg
+            self._update_analysis_status('running', current_step='Scan du montage Zurg...')
+            used_torrents = self.scan_zurg_usage()
+            
+            self._update_analysis_progress({
+                'used_torrents_count': len(used_torrents),
+                'current_step': 'Récupération des torrents Real-Debrid...'
+            })
+            
+            # Vérifier arrêt demandé
+            if self.should_stop:
+                self._update_analysis_status('cancelled')
+                return
+            
+            # Étape 2 : Compter les torrents candidats
+            with sqlite3.connect(DB_PATH) as conn:
+                c = conn.cursor()
+                
+                # Importer les constantes
+                try:
+                    from main import ACTIVE_STATUSES, ERROR_STATUSES, COMPLETED_STATUSES
+                except ImportError:
+                    ACTIVE_STATUSES = ('downloading', 'queued', 'waiting_files_selection', 'magnet_conversion', 'uploading', 'compressing', 'waiting')
+                    ERROR_STATUSES = ('error', 'magnet_error', 'virus', 'dead', 'timeout', 'hoster_unavailable')
+                    COMPLETED_STATUSES = ('downloaded', 'finished')
+                
+                PROTECTED_STATUSES = ACTIVE_STATUSES + ERROR_STATUSES
+                
+                # Compter les candidats
+                count_query = self._build_candidate_query(PROTECTED_STATUSES, COMPLETED_STATUSES, count_only=True)
+                c.execute(count_query)
+                total_candidates = c.fetchone()[0]
+                
+                self._update_analysis_progress({
+                    'total_torrents': total_candidates,
+                    'current_step': f'Analyse de {total_candidates} torrents candidats...'
+                })
+            
+            # Étape 3 : Traitement par chunks avec sauvegarde
+            chunk_size = 1000
+            unused_torrents = []
+            protected_count = 0
+            
+            for offset in range(0, total_candidates, chunk_size):
+                if self.should_stop:
+                    self._update_analysis_status('cancelled')
+                    return
+                
+                # Traiter le chunk
+                chunk_results = self._process_chunk_persistent(
+                    offset, chunk_size, used_torrents, 
+                    PROTECTED_STATUSES, COMPLETED_STATUSES
+                )
+                
+                unused_torrents.extend(chunk_results['unused'])
+                protected_count += chunk_results['protected']
+                
+                # Sauvegarder le chunk
+                self._save_chunk_results(offset // chunk_size, chunk_results['unused'])
+                
+                # Mettre à jour la progression
+                progress = min(100, int((offset + chunk_size) / total_candidates * 100))
+                self._update_analysis_progress({
+                    'progress': progress,
+                    'processed_torrents': min(offset + chunk_size, total_candidates),
+                    'unused_torrents_count': len(unused_torrents),
+                    'current_step': f'Chunk {offset//chunk_size + 1}/{(total_candidates//chunk_size) + 1} traité'
+                })
+                
+                # Pause pour éviter la surcharge
+                import time
+                time.sleep(0.1)
+            
+            # Étape 4 : Finalisation
+            if not self.should_stop:
+                self._finalize_analysis(unused_torrents, protected_count)
+            
+        except Exception as e:
+            logger.error(f"Erreur dans l'analyse persistante: {e}")
+            self._update_analysis_status('error', error_message=str(e))
+    
+    def _build_candidate_query(self, PROTECTED_STATUSES: tuple, COMPLETED_STATUSES: tuple, count_only: bool = False) -> str:
+        """Construit la requête pour les torrents candidats"""
+        if count_only:
+            base_query = "SELECT COUNT(*)"
+        else:
+            base_query = """
+                SELECT t.id, t.filename, t.bytes, t.added_on, td.name, 
+                       COALESCE(td.status, t.status) as current_status
+            """
+        
+        base_query += """
+            FROM torrents t
+            LEFT JOIN torrent_details td ON t.id = td.id
+            WHERE t.status != 'deleted'
+        """
+        
+        # Filtres de sécurité
+        protected_statuses_str = "', '".join(PROTECTED_STATUSES)
+        base_query += f" AND COALESCE(td.status, t.status) NOT IN ('{protected_statuses_str}')"
+        
+        if self.min_age_days > 0:
+            base_query += f" AND (datetime(t.added_on) <= datetime('now', '-{self.min_age_days} days') OR t.added_on IS NULL)"
+        
+        completed_statuses_str = "', '".join(COMPLETED_STATUSES)
+        base_query += f" AND COALESCE(td.status, t.status) IN ('{completed_statuses_str}')"
+        
+        if not count_only:
+            base_query += " ORDER BY t.added_on DESC LIMIT ? OFFSET ?"
+        
+        return base_query
+    
+    def _process_chunk_persistent(self, offset: int, chunk_size: int, used_torrents: set, 
+                                 PROTECTED_STATUSES: tuple, COMPLETED_STATUSES: tuple) -> Dict:
+        """Traite un chunk avec sauvegarde persistante"""
+        
+        with sqlite3.connect(DB_PATH) as conn:
+            c = conn.cursor()
+            
+            query = self._build_candidate_query(PROTECTED_STATUSES, COMPLETED_STATUSES)
+            c.execute(query, (chunk_size, offset))
+            chunk_torrents = c.fetchall()
+        
+        return self._process_torrent_chunk(chunk_torrents, used_torrents, PROTECTED_STATUSES, COMPLETED_STATUSES)
+    
+    def _save_chunk_results(self, chunk_index: int, chunk_results: List[Dict]):
+        """Sauvegarde les résultats d'un chunk"""
+        try:
+            with sqlite3.connect(SYMLINK_DB_PATH) as conn:
+                c = conn.cursor()
+                c.execute('''
+                    INSERT OR REPLACE INTO cleanup_temp_results 
+                    (analysis_id, chunk_index, torrent_data)
+                    VALUES (?, ?, ?)
+                ''', (
+                    self.analysis_id,
+                    chunk_index,
+                    json.dumps(chunk_results)
+                ))
+                conn.commit()
+                
+        except Exception as e:
+            logger.error(f"Erreur sauvegarde chunk {chunk_index}: {e}")
+    
+    def _update_analysis_status(self, status: str, error_message: str = None, current_step: str = None):
+        """Met à jour le statut de l'analyse"""
+        try:
+            with sqlite3.connect(SYMLINK_DB_PATH) as conn:
+                c = conn.cursor()
+                
+                update_fields = ['status = ?']
+                update_values = [status]
+                
+                if status in ('completed', 'cancelled', 'error'):
+                    update_fields.append('end_time = CURRENT_TIMESTAMP')
+                
+                if error_message:
+                    update_fields.append('error_message = ?')
+                    update_values.append(error_message)
+                
+                if current_step:
+                    update_fields.append('current_step = ?')
+                    update_values.append(current_step)
+                
+                update_values.append(self.analysis_id)
+                
+                c.execute(f'''
+                    UPDATE cleanup_analyses 
+                    SET {', '.join(update_fields)}
+                    WHERE id = ?
+                ''', update_values)
+                conn.commit()
+                
+        except Exception as e:
+            logger.error(f"Erreur mise à jour statut analyse: {e}")
+    
+    def _update_analysis_progress(self, progress_data: Dict):
+        """Met à jour la progression de l'analyse"""
+        try:
+            with sqlite3.connect(SYMLINK_DB_PATH) as conn:
+                c = conn.cursor()
+                
+                update_fields = []
+                update_values = []
+                
+                for field in ['progress', 'current_step', 'total_torrents', 'processed_torrents', 
+                             'used_torrents_count', 'unused_torrents_count']:
+                    if field in progress_data:
+                        update_fields.append(f'{field} = ?')
+                        update_values.append(progress_data[field])
+                
+                if update_fields:
+                    update_values.append(self.analysis_id)
+                    c.execute(f'''
+                        UPDATE cleanup_analyses 
+                        SET {', '.join(update_fields)}
+                        WHERE id = ?
+                    ''', update_values)
+                    conn.commit()
+                
+        except Exception as e:
+            logger.error(f"Erreur mise à jour progression: {e}")
+    
+    def _finalize_analysis(self, unused_torrents: List[Dict], protected_count: int):
+        """Finalise l'analyse avec les résultats complets"""
+        try:
+            # Statistiques finales
+            total_size = sum(t.get('size', 0) for t in unused_torrents if t.get('size'))
+            safe_count = len([t for t in unused_torrents if t.get('is_safe_to_delete', False)])
+            
+            results = {
+                'unused_torrents': unused_torrents,
+                'stats': {
+                    'total_unused': len(unused_torrents),
+                    'total_size': total_size,
+                    'total_size_formatted': self._format_size(total_size),
+                    'safe_to_delete': safe_count,
+                    'protected_count': protected_count,
+                    'analyzed_at': datetime.now().isoformat(),
+                    'zurg_path': self.zurg_path,
+                    'min_age_days': self.min_age_days
+                }
+            }
+            
+            # Sauvegarder les résultats finaux
+            with sqlite3.connect(SYMLINK_DB_PATH) as conn:
+                c = conn.cursor()
+                c.execute('''
+                    UPDATE cleanup_analyses 
+                    SET status = 'completed', 
+                        end_time = CURRENT_TIMESTAMP,
+                        progress = 100,
+                        unused_torrents_count = ?,
+                        results_json = ?,
+                        current_step = 'Terminé'
+                    WHERE id = ?
+                ''', (
+                    len(unused_torrents),
+                    json.dumps(results),
+                    self.analysis_id
+                ))
+                conn.commit()
+            
+            # Nettoyer les chunks temporaires
+            self._cleanup_temp_chunks()
+            
+            logger.info(f"Analyse {self.analysis_id} terminée : {len(unused_torrents)} orphelins trouvés")
+            
+        except Exception as e:
+            logger.error(f"Erreur finalisation analyse: {e}")
+            self._update_analysis_status('error', error_message=str(e))
+    
+    def _cleanup_temp_chunks(self):
+        """Nettoie les chunks temporaires après finalisation"""
+        try:
+            with sqlite3.connect(SYMLINK_DB_PATH) as conn:
+                c = conn.cursor()
+                c.execute('DELETE FROM cleanup_temp_results WHERE analysis_id = ?', (self.analysis_id,))
+                conn.commit()
+        except Exception as e:
+            logger.error(f"Erreur nettoyage chunks: {e}")
+    
+    def stop_analysis(self):
+        """Arrête l'analyse en cours"""
+        self.should_stop = True
+        self._update_analysis_status('cancelled', current_step='Arrêt demandé...')
+    
+    def get_analysis_status(self) -> Dict:
+        """Récupère le statut actuel de l'analyse"""
+        try:
+            with sqlite3.connect(SYMLINK_DB_PATH) as conn:
+                c = conn.cursor()
+                c.execute('''
+                    SELECT status, progress, current_step, total_torrents, 
+                           processed_torrents, unused_torrents_count, error_message,
+                           start_time, end_time, results_json
+                    FROM cleanup_analyses 
+                    WHERE id = ?
+                ''', (self.analysis_id,))
+                
+                row = c.fetchone()
+                if not row:
+                    return {'error': 'Analyse non trouvée'}
+                
+                status_data = {
+                    'analysis_id': self.analysis_id,
+                    'status': row[0],
+                    'progress': row[1] or 0,
+                    'current_step': row[2],
+                    'total_torrents': row[3] or 0,
+                    'processed_torrents': row[4] or 0,
+                    'unused_torrents_count': row[5] or 0,
+                    'error_message': row[6],
+                    'start_time': row[7],
+                    'end_time': row[8],
+                    'is_running': row[0] == 'running'
+                }
+                
+                # Ajouter les résultats si terminé
+                if row[0] == 'completed' and row[9]:
+                    status_data['results'] = json.loads(row[9])
+                
+                return status_data
+                
+        except Exception as e:
+            logger.error(f"Erreur récupération statut: {e}")
+            return {'error': str(e)}
+    
+    @staticmethod
+    def recover_partial_results(analysis_id: str) -> Dict:
+        """Récupère les résultats partiels d'une analyse interrompue"""
+        try:
+            with sqlite3.connect(SYMLINK_DB_PATH) as conn:
+                c = conn.cursor()
+                
+                # Récupérer les chunks sauvegardés
+                c.execute('''
+                    SELECT chunk_index, torrent_data 
+                    FROM cleanup_temp_results 
+                    WHERE analysis_id = ?
+                    ORDER BY chunk_index
+                ''', (analysis_id,))
+                
+                chunks = c.fetchall()
+                partial_results = []
+                
+                for chunk_index, torrent_data in chunks:
+                    try:
+                        chunk_torrents = json.loads(torrent_data)
+                        partial_results.extend(chunk_torrents)
+                    except json.JSONDecodeError:
+                        logger.warning(f"Chunk {chunk_index} corrompu pour {analysis_id}")
+                
+                return {
+                    'analysis_id': analysis_id,
+                    'partial_results': partial_results,
+                    'chunks_recovered': len(chunks),
+                    'torrents_recovered': len(partial_results)
+                }
+                
+        except Exception as e:
+            logger.error(f"Erreur récupération résultats partiels: {e}")
+            return {'error': str(e)}
+    
+    @staticmethod
+    def list_active_analyses() -> List[Dict]:
+        """Liste toutes les analyses en cours ou récentes"""
+        try:
+            with sqlite3.connect(SYMLINK_DB_PATH) as conn:
+                c = conn.cursor()
+                c.execute('''
+                    SELECT id, status, start_time, progress, current_step, 
+                           total_torrents, unused_torrents_count
+                    FROM cleanup_analyses 
+                    ORDER BY start_time DESC 
+                    LIMIT 10
+                ''')
+                
+                analyses = []
+                for row in c.fetchall():
+                    analyses.append({
+                        'id': row[0],
+                        'status': row[1],
+                        'start_time': row[2],
+                        'progress': row[3] or 0,
+                        'current_step': row[4],
+                        'total_torrents': row[5] or 0,
+                        'unused_torrents_count': row[6] or 0
+                    })
+                
+                return analyses
+                
+        except Exception as e:
+            logger.error(f"Erreur listage analyses: {e}")
+            return []
         
     def _load_cleanup_config(self) -> Dict:
         """Charge la configuration cleanup depuis la base de données"""
@@ -373,79 +834,130 @@ class TorrentCleanupAnalyzer:
             # Fallback simple si difflib non disponible
             return 100.0 if name1 == name2 else 0.0
     
+    def _process_torrent_chunk(self, torrents: List, used_torrents: set, PROTECTED_STATUSES: tuple, COMPLETED_STATUSES: tuple) -> Dict:
+        """Traite un chunk de torrents pour identifier les orphelins"""
+        chunk_result = {
+            'unused': [],
+            'protected': 0
+        }
+        
+        for torrent in torrents:
+            torrent_id, filename, bytes_size, added_on, detail_name, current_status = torrent
+            
+            # Double vérification de sécurité : ne jamais traiter les torrents protégés
+            if current_status in PROTECTED_STATUSES:
+                chunk_result['protected'] += 1
+                if self.detailed_logs:
+                    logger.debug(f"🛡️ Torrent protégé ignoré: {detail_name or filename} (statut: {current_status})")
+                continue
+            
+            # Utiliser le nom détaillé si disponible, sinon le filename
+            name_to_check = detail_name or filename
+            normalized_rd_name = self.normalize_torrent_name(name_to_check)
+            
+            # Vérifier la taille minimum si configurée
+            if self.min_size_mb > 0 and bytes_size:
+                size_mb = bytes_size / (1024 * 1024)
+                if size_mb < self.min_size_mb:
+                    if self.detailed_logs:
+                        logger.debug(f"🔽 Torrent trop petit ignoré: {name_to_check} ({size_mb:.1f} MB < {self.min_size_mb} MB)")
+                    continue
+            
+            # Vérifier si utilisé (correspondance avec seuil de similarité)
+            is_used = False
+            best_match_score = 0
+            best_match_name = ""
+            
+            # Optimisation : arrêter dès qu'on trouve une correspondance
+            for used_name in used_torrents:
+                similarity = self.calculate_similarity(normalized_rd_name, used_name)
+                if similarity > best_match_score:
+                    best_match_score = similarity
+                    best_match_name = used_name
+                
+                if similarity >= self.match_threshold:
+                    is_used = True
+                    if self.detailed_logs:
+                        logger.debug(f"✅ Correspondance trouvée: {name_to_check} <-> {used_name} ({similarity:.1f}%)")
+                    break
+            
+            if not is_used:
+                chunk_result['unused'].append({
+                    'id': torrent_id,
+                    'name': name_to_check,
+                    'filename': filename,
+                    'size': bytes_size,
+                    'size_formatted': self._format_size(bytes_size) if bytes_size else 'N/A',
+                    'added_on': added_on,
+                    'status': current_status,
+                    'age_days': self.calculate_age_days(added_on),
+                    'best_match': best_match_name,
+                    'best_match_score': round(best_match_score, 1),
+                    'is_safe_to_delete': current_status in COMPLETED_STATUSES
+                })
+                
+                if self.detailed_logs:
+                    logger.debug(f"❌ Torrent orphelin: {name_to_check} (statut: {current_status}, meilleure correspondance: {best_match_name} à {best_match_score:.1f}%)")
+        
+        return chunk_result
+    
+    # Ancienne méthode find_unused_torrents - garde la compatibilité mais utilise maintenant le système par chunks
     def find_unused_torrents(self) -> List[Dict]:
-        """Identifie les torrents RD inutilisés"""
-        unused_torrents = []
+        """Identifie les torrents RD inutilisés - Version compatible synchrone"""
+        logger.warning("Utilisation de find_unused_torrents synchrone - recommandé d'utiliser start_analysis_async()")
+        
+        # Importer les constantes de statuts depuis main.py
+        try:
+            from main import ACTIVE_STATUSES, ERROR_STATUSES, COMPLETED_STATUSES
+        except ImportError:
+            # Fallback si l'import échoue
+            ACTIVE_STATUSES = ('downloading', 'queued', 'waiting_files_selection', 'magnet_conversion', 'uploading', 'compressing', 'waiting')
+            ERROR_STATUSES = ('error', 'magnet_error', 'virus', 'dead', 'timeout', 'hoster_unavailable')
+            COMPLETED_STATUSES = ('downloaded', 'finished')
+        
+        # Statuts qui ne doivent JAMAIS être supprimés automatiquement
+        PROTECTED_STATUSES = ACTIVE_STATUSES + ERROR_STATUSES
         
         try:
             # 1. Scanner les torrents utilisés dans Zurg
             used_torrents = self.scan_zurg_usage()
+            logger.info(f"📊 Torrents utilisés dans Zurg: {len(used_torrents)}")
             
-            # 2. Récupérer tous les torrents RD depuis la base principale
+            # 2. Traitement direct par chunks plus petit pour compatibilité
+            unused_torrents = []
+            chunk_size = 500  # Plus petit pour éviter timeouts sur l'ancienne méthode
+            
             with sqlite3.connect(DB_PATH) as conn:
                 c = conn.cursor()
-                # Requête corrigée pour gérer les dates ISO
-                c.execute("""
-                    SELECT t.id, t.filename, t.bytes, t.added_on, td.name, t.status
-                    FROM torrents t
-                    LEFT JOIN torrent_details td ON t.id = td.id
-                    WHERE t.status != 'deleted'
-                    AND (datetime(t.added_on) <= datetime('now', '-{} days') OR t.added_on IS NULL)
-                """.format(self.min_age_days))
                 
-                torrents = c.fetchall()
+                # Compter les candidats
+                count_query = self._build_candidate_query(PROTECTED_STATUSES, COMPLETED_STATUSES, count_only=True)
+                c.execute(count_query)
+                total_candidates = c.fetchone()[0]
+                
+                logger.info(f"� Total torrents candidats: {total_candidates}")
+                
+                # Traiter par chunks
+                for offset in range(0, total_candidates, chunk_size):
+                    chunk_results = self._process_chunk_persistent(
+                        offset, chunk_size, used_torrents,
+                        PROTECTED_STATUSES, COMPLETED_STATUSES
+                    )
+                    unused_torrents.extend(chunk_results['unused'])
+                    
+                    # Petite pause pour éviter la surcharge
+                    time.sleep(0.05)
             
-            # 3. Comparer et identifier les orphelins
-            for torrent in torrents:
-                torrent_id, filename, bytes_size, added_on, detail_name, status = torrent
-                
-                # Utiliser le nom détaillé si disponible, sinon le filename
-                name_to_check = detail_name or filename
-                normalized_rd_name = self.normalize_torrent_name(name_to_check)
-                
-                # Vérifier la taille minimum si configurée
-                if self.min_size_mb > 0 and bytes_size:
-                    size_mb = bytes_size / (1024 * 1024)
-                    if size_mb < self.min_size_mb:
-                        continue
-                
-                # Vérifier si utilisé (correspondance avec seuil de similarité)
-                is_used = False
-                best_match_score = 0
-                best_match_name = ""
-                
-                for used_name in used_torrents:
-                    similarity = self.calculate_similarity(normalized_rd_name, used_name)
-                    if similarity > best_match_score:
-                        best_match_score = similarity
-                        best_match_name = used_name
-                    
-                    if similarity >= self.match_threshold:
-                        is_used = True
-                        break
-                
-                if not is_used:
-                    unused_torrents.append({
-                        'id': torrent_id,
-                        'name': name_to_check,
-                        'filename': filename,
-                        'size': bytes_size,
-                        'size_formatted': self._format_size(bytes_size) if bytes_size else 'N/A',
-                        'added_on': added_on,
-                        'status': status,
-                        'age_days': self.calculate_age_days(added_on),
-                        'best_match': best_match_name,
-                        'best_match_score': round(best_match_score, 1)
-                    })
-                    
-                    if self.detailed_logs:
-                        logger.debug(f"Torrent orphelin: {name_to_check} (meilleure correspondance: {best_match_name} à {best_match_score}%)")
+            # Statistiques de sécurité
+            safe_count = len([t for t in unused_torrents if t['is_safe_to_delete']])
+            logger.info(f"� Analyse terminée: {len(unused_torrents)} torrents orphelins trouvés")
+            logger.info(f"✅ {safe_count}/{len(unused_torrents)} torrents sûrs à supprimer")
+            
+            return unused_torrents
             
         except Exception as e:
             logger.error(f"Erreur recherche torrents inutilisés: {e}")
-        
-        logger.info(f"Trouvé {len(unused_torrents)} torrents orphelins")
-        return unused_torrents
+            return []
     
     def calculate_age_days(self, added_on: str) -> int:
         """Calcule l'âge d'un torrent en jours"""
@@ -1557,7 +2069,93 @@ def register_symlink_routes(app: Flask):
             return jsonify({'success': False, 'error': str(e)}), 500
     
     # ═══════════════════════════════════════════════════════════════════════════════
-    # NOUVELLES ROUTES POUR LE CLEANUP DES TORRENTS
+    # NOUVELLES ROUTES POUR LE CLEANUP DES TORRENTS ASYNCHRONE
+    # ═══════════════════════════════════════════════════════════════════════════════
+    
+    @app.route('/api/symlink/cleanup/analyze/async', methods=['POST'])
+    def start_async_analysis():
+        """Démarre une analyse asynchrone avec persistance"""
+        try:
+            data = request.get_json() or {}
+            user_session = request.headers.get('X-Session-ID', 'anonymous')
+            
+            analyzer = TorrentCleanupAnalyzer()
+            analysis_id = analyzer.start_analysis_async(user_session)
+            
+            return jsonify({
+                'success': True,
+                'analysis_id': analysis_id,
+                'message': 'Analyse démarrée en arrière-plan'
+            })
+            
+        except Exception as e:
+            logger.error(f"Erreur démarrage analyse async: {e}")
+            return jsonify({'success': False, 'error': str(e)}), 500
+
+    @app.route('/api/symlink/cleanup/analysis/<analysis_id>/status', methods=['GET'])
+    def get_analysis_status(analysis_id):
+        """Récupère le statut d'une analyse"""
+        try:
+            analyzer = TorrentCleanupAnalyzer(analysis_id=analysis_id)
+            status = analyzer.get_analysis_status()
+            
+            return jsonify({
+                'success': True,
+                'status': status
+            })
+            
+        except Exception as e:
+            logger.error(f"Erreur récupération statut: {e}")
+            return jsonify({'success': False, 'error': str(e)}), 500
+
+    @app.route('/api/symlink/cleanup/analysis/<analysis_id>/stop', methods=['POST'])
+    def stop_analysis(analysis_id):
+        """Arrête une analyse en cours"""
+        try:
+            analyzer = TorrentCleanupAnalyzer(analysis_id=analysis_id)
+            analyzer.stop_analysis()
+            
+            return jsonify({
+                'success': True,
+                'message': 'Arrêt de l\'analyse demandé'
+            })
+            
+        except Exception as e:
+            logger.error(f"Erreur arrêt analyse: {e}")
+            return jsonify({'success': False, 'error': str(e)}), 500
+
+    @app.route('/api/symlink/cleanup/analyses', methods=['GET'])
+    def list_analyses():
+        """Liste les analyses actives et récentes"""
+        try:
+            analyses = TorrentCleanupAnalyzer.list_active_analyses()
+            
+            return jsonify({
+                'success': True,
+                'analyses': analyses
+            })
+            
+        except Exception as e:
+            logger.error(f"Erreur listage analyses: {e}")
+            return jsonify({'success': False, 'error': str(e)}), 500
+
+    @app.route('/api/symlink/cleanup/analysis/<analysis_id>/recover', methods=['POST'])
+    def recover_partial_analysis(analysis_id):
+        """Récupère les résultats partiels d'une analyse interrompue"""
+        try:
+            results = TorrentCleanupAnalyzer.recover_partial_results(analysis_id)
+            
+            return jsonify({
+                'success': True,
+                'recovery': results
+            })
+            
+        except Exception as e:
+            logger.error(f"Erreur récupération partielle: {e}")
+            return jsonify({'success': False, 'error': str(e)}), 500
+    
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # ROUTES CLEANUP EXISTANTES (Compatibilité)
     # ═══════════════════════════════════════════════════════════════════════════════
     
     @app.route('/api/symlink/cleanup/config', methods=['GET'])
@@ -1578,7 +2176,7 @@ def register_symlink_routes(app: Flask):
                 cleanup_config = {
                     'cleanup_enabled': bool(config.get('cleanup_enabled', False)),
                     'zurg_path': config.get('zurg_path', '/home/kesurof/seedbox/zurg/__all__'),
-                    'cleanup_min_age_days': config.get('cleanup_min_age_days', 2),
+                    'cleanup_min_age_days': config.get('cleanup_min_age_days', 0),
                     'cleanup_min_size_mb': config.get('cleanup_min_size_mb', 0),
                     'organized_media_path': config.get('organized_media_path', '/app/medias'),
                     'cleanup_dry_run_default': bool(config.get('cleanup_dry_run_default', True)),

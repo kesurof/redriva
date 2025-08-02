@@ -29,7 +29,7 @@ def init_cleanup_database():
         cleanup_columns = [
             ('cleanup_enabled', 'BOOLEAN DEFAULT 0'),
             ('zurg_path', 'TEXT DEFAULT "/home/kesurof/seedbox/zurg/__all__"'),
-            ('cleanup_min_age_days', 'INTEGER DEFAULT 2'),
+            ('cleanup_min_age_days', 'INTEGER DEFAULT 0'),
             ('cleanup_min_size_mb', 'INTEGER DEFAULT 0'),
             ('organized_media_path', 'TEXT DEFAULT "/app/medias"'),
             ('cleanup_dry_run_default', 'BOOLEAN DEFAULT 1'),

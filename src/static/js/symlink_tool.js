@@ -13,6 +13,10 @@ let loadedDirectories = [];
 let selectedCleanupTorrents = new Set();
 let cleanupAnalysisData = null;
 
+// Variables pour les analyses asynchrones
+let currentAnalysisId = null;
+let analysisPollingInterval = null;
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // GESTION DES ONGLETS
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -485,7 +489,7 @@ function populateCleanupConfigForm(config) {
     // Configuration principale cleanup
     document.getElementById('cleanup-enabled').checked = config.cleanup_enabled || false;
     document.getElementById('zurg-path').value = config.zurg_path || '/home/kesurof/seedbox/zurg/__all__';
-    document.getElementById('cleanup-min-age').value = config.cleanup_min_age_days || 2;
+    document.getElementById('cleanup-min-age').value = config.cleanup_min_age_days || 0;
     document.getElementById('cleanup-min-size').value = config.cleanup_min_size_mb || 0;
     document.getElementById('organized-media-path').value = config.organized_media_path || '/app/medias';
     document.getElementById('cleanup-dry-run-default').checked = config.cleanup_dry_run_default !== undefined ? config.cleanup_dry_run_default : true;
@@ -774,31 +778,32 @@ function loadCleanup() {
     // Masquer le bouton d'analyse réelle
     const realAnalyzeBtn = document.getElementById('real-analyze-btn');
     if (realAnalyzeBtn) realAnalyzeBtn.style.display = 'none';
+    
+    // Charger les analyses actives
+    loadActiveAnalyses();
 }
 
 async function analyzeUnusedTorrents(dryRun = true) {
     try {
-        showLoading('Analyse des torrents inutilisés...');
+        showLoading('Démarrage de l\'analyse...');
         
-        const response = await apiCall('/api/symlink/cleanup/analyze', {
+        // Démarrer l'analyse asynchrone
+        const response = await apiCall('/api/symlink/cleanup/analyze/async', {
             method: 'POST',
+            headers: {
+                'X-Session-ID': generateSessionId()
+            },
             body: JSON.stringify({ dry_run: dryRun })
         });
         
-        hideLoading();
-        
         if (response.success) {
-            cleanupAnalysisData = response;
-            displayCleanupResults(response);
-            
-            // Afficher le bouton de suppression réelle après un dry-run réussi
-            if (dryRun && response.unused_torrents.length > 0) {
-                document.getElementById('real-analyze-btn').style.display = 'inline-block';
-            }
-            
-            showToast(`✅ Analyse terminée: ${response.stats.total_unused} torrents orphelins trouvés`, 'success');
+            currentAnalysisId = response.analysis_id;
+            showAnalysisInProgress();
+            startAnalysisPolling();
+            showToast('✅ Analyse démarrée en arrière-plan', 'success');
         } else {
-            showToast('❌ Erreur lors de l\'analyse: ' + response.error, 'error');
+            hideLoading();
+            showToast('❌ Erreur: ' + response.error, 'error');
         }
     } catch (error) {
         hideLoading();
@@ -807,8 +812,193 @@ async function analyzeUnusedTorrents(dryRun = true) {
     }
 }
 
+function startAnalysisPolling() {
+    if (analysisPollingInterval) {
+        clearInterval(analysisPollingInterval);
+    }
+    
+    analysisPollingInterval = setInterval(async () => {
+        if (!currentAnalysisId) return;
+        
+        try {
+            const response = await apiCall(`/api/symlink/cleanup/analysis/${currentAnalysisId}/status`);
+            
+            if (response.success) {
+                updateAnalysisProgress(response.status);
+                
+                if (!response.status.is_running) {
+                    // Analyse terminée
+                    stopAnalysisPolling();
+                    onAnalysisCompleted(response.status);
+                }
+            }
+        } catch (error) {
+            console.error('Erreur polling analyse:', error);
+            stopAnalysisPolling();
+        }
+    }, 2000); // Polling toutes les 2 secondes
+}
+
+function stopAnalysisPolling() {
+    if (analysisPollingInterval) {
+        clearInterval(analysisPollingInterval);
+        analysisPollingInterval = null;
+    }
+}
+
+function updateAnalysisProgress(status) {
+    const progressDiv = document.getElementById('cleanup-progress');
+    const progressBar = document.getElementById('cleanup-progress-bar');
+    const progressText = document.getElementById('cleanup-progress-text');
+    const stepText = document.getElementById('cleanup-step-text');
+    const orphansText = document.getElementById('cleanup-orphans-text');
+    
+    if (progressBar) {
+        progressBar.style.width = `${status.progress}%`;
+        progressBar.textContent = `${status.progress}%`;
+    }
+    
+    if (progressText) {
+        progressText.textContent = `${status.processed_torrents || 0} / ${status.total_torrents || 0} torrents traités`;
+    }
+    
+    if (stepText) {
+        stepText.textContent = status.current_step || 'En cours...';
+    }
+    
+    // Afficher le nombre d'orphelins trouvés en temps réel
+    if (status.unused_torrents_count > 0 && orphansText) {
+        orphansText.textContent = `${status.unused_torrents_count} torrents orphelins trouvés`;
+        orphansText.style.display = 'block';
+    }
+}
+
+function showAnalysisInProgress() {
+    // Masquer les boutons d'analyse
+    const analyzeBtn = document.getElementById('analyze-btn');
+    const realAnalyzeBtn = document.getElementById('real-analyze-btn');
+    if (analyzeBtn) analyzeBtn.style.display = 'none';
+    if (realAnalyzeBtn) realAnalyzeBtn.style.display = 'none';
+    
+    // Afficher la progression
+    const progressDiv = document.getElementById('cleanup-progress');
+    if (progressDiv) {
+        progressDiv.style.display = 'block';
+        progressDiv.innerHTML = `
+            <h4>⏳ Analyse en cours...</h4>
+            <div class="progress" style="height: 25px; margin-bottom: 15px;">
+                <div id="cleanup-progress-bar" class="progress-bar progress-bar-striped progress-bar-animated" style="width: 0%;">0%</div>
+            </div>
+            <div class="progress-info">
+                <div id="cleanup-step-text" class="text-muted">Initialisation...</div>
+                <div id="cleanup-progress-text" class="text-small">0 / 0 torrents traités</div>
+                <div id="cleanup-orphans-text" class="text-success" style="display: none;"></div>
+            </div>
+            <div style="margin-top: 15px;">
+                <button onclick="stopCurrentAnalysis()" class="btn btn-warning btn-sm">
+                    ⏹️ Arrêter l'analyse
+                </button>
+            </div>
+        `;
+    }
+    
+    // Masquer les résultats précédents
+    const statsDiv = document.getElementById('cleanup-stats');
+    const resultsDiv = document.getElementById('cleanup-results');
+    if (statsDiv) statsDiv.style.display = 'none';
+    if (resultsDiv) resultsDiv.style.display = 'none';
+}
+
+async function stopCurrentAnalysis() {
+    if (!currentAnalysisId) return;
+    
+    try {
+        const response = await apiCall(`/api/symlink/cleanup/analysis/${currentAnalysisId}/stop`, {
+            method: 'POST'
+        });
+        
+        if (response.success) {
+            showToast('⏹️ Arrêt de l\'analyse demandé', 'info');
+        }
+    } catch (error) {
+        console.error('Erreur arrêt analyse:', error);
+    }
+}
+
+function onAnalysisCompleted(status) {
+    currentAnalysisId = null;
+    hideLoading();
+    
+    // Masquer la progression
+    const progressDiv = document.getElementById('cleanup-progress');
+    if (progressDiv) progressDiv.style.display = 'none';
+    
+    // Réafficher les boutons d'analyse
+    const analyzeBtn = document.getElementById('analyze-btn');
+    if (analyzeBtn) analyzeBtn.style.display = 'inline-block';
+    
+    if (status.status === 'completed' && status.results) {
+        cleanupAnalysisData = status.results;
+        displayCleanupResults(status.results);
+        
+        // Afficher le bouton d'analyse réelle si c'était un dry-run
+        if (status.results.unused_torrents && status.results.unused_torrents.length > 0) {
+            const realAnalyzeBtn = document.getElementById('real-analyze-btn');
+            if (realAnalyzeBtn) realAnalyzeBtn.style.display = 'inline-block';
+        }
+        
+        showToast(`✅ Analyse terminée: ${status.results.stats.total_unused} orphelins trouvés`, 'success');
+    } else if (status.status === 'cancelled') {
+        showToast('⏹️ Analyse annulée', 'warning');
+        // Réafficher les boutons
+        const analyzeBtn = document.getElementById('analyze-btn');
+        if (analyzeBtn) analyzeBtn.style.display = 'inline-block';
+    } else if (status.status === 'error') {
+        showToast(`❌ Erreur: ${status.error_message}`, 'error');
+        // Réafficher les boutons
+        const analyzeBtn = document.getElementById('analyze-btn');
+        if (analyzeBtn) analyzeBtn.style.display = 'inline-block';
+    }
+}
+
+async function loadActiveAnalyses() {
+    try {
+        const response = await apiCall('/api/symlink/cleanup/analyses');
+        
+        if (response.success) {
+            displayActiveAnalyses(response.analyses);
+            
+            // Reprendre le suivi d'une analyse en cours
+            const runningAnalysis = response.analyses.find(a => a.status === 'running');
+            if (runningAnalysis) {
+                currentAnalysisId = runningAnalysis.id;
+                showAnalysisInProgress();
+                startAnalysisPolling();
+                showToast('📄 Reprise d\'une analyse en cours...', 'info');
+            }
+        }
+    } catch (error) {
+        console.error('Erreur chargement analyses actives:', error);
+    }
+}
+
+function displayActiveAnalyses(analyses) {
+    if (!analyses || analyses.length === 0) return;
+    
+    // Afficher une petite section des analyses récentes si besoin
+    const recentAnalyses = analyses.slice(0, 3);
+    // Cette fonction peut être étendue pour afficher l'historique des analyses
+}
+
+function generateSessionId() {
+    return 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+}
+
 function displayCleanupResults(data) {
-    // Afficher les statistiques
+    // Afficher les statistiques avec informations de sécurité
+    const safeCount = data.unused_torrents.filter(t => t.is_safe_to_delete).length;
+    const unsafeCount = data.unused_torrents.length - safeCount;
+    
     const statsDiv = document.getElementById('cleanup-stats');
     statsDiv.innerHTML = `
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
@@ -816,6 +1006,16 @@ function displayCleanupResults(data) {
                 <div class="stat-number">${data.stats.total_unused}</div>
                 <div class="stat-label">Torrents orphelins</div>
             </div>
+            <div class="stat-item">
+                <div class="stat-number" style="color: #28a745;">${safeCount}</div>
+                <div class="stat-label">Sûrs à supprimer</div>
+            </div>
+            ${unsafeCount > 0 ? `
+            <div class="stat-item">
+                <div class="stat-number" style="color: #ffc107;">${unsafeCount}</div>
+                <div class="stat-label">Protégés (actifs/erreur)</div>
+            </div>
+            ` : ''}
             <div class="stat-item">
                 <div class="stat-number">${data.stats.total_size_formatted}</div>
                 <div class="stat-label">Espace récupérable</div>
@@ -826,19 +1026,48 @@ function displayCleanupResults(data) {
             </div>
         </div>
     `;
+    
+    // Afficher un avertissement si des torrents non-sûrs sont présents
+    if (unsafeCount > 0) {
+        statsDiv.innerHTML += `
+            <div style="background: #fff3cd; border: 1px solid #ffeeba; color: #856404; padding: 12px; border-radius: 4px; margin-top: 15px;">
+                <strong>⚠️ Attention:</strong> ${unsafeCount} torrent(s) avec statut non-finalisé détecté(s). Ces torrents sont automatiquement exclus de la suppression pour votre sécurité.
+            </div>
+        `;
+    }
+    
     statsDiv.style.display = 'block';
     
     // Afficher la liste des torrents
     const tbody = document.getElementById('cleanup-torrents-list');
     tbody.innerHTML = '';
     
-    data.unused_torrents.forEach(torrent => {
+    // Trier les torrents : sûrs en premier, puis non-sûrs
+    const sortedTorrents = [...data.unused_torrents].sort((a, b) => {
+        if (a.is_safe_to_delete && !b.is_safe_to_delete) return -1;
+        if (!a.is_safe_to_delete && b.is_safe_to_delete) return 1;
+        return 0;
+    });
+    
+    sortedTorrents.forEach(torrent => {
+        const isSafe = torrent.is_safe_to_delete;
+        const rowStyle = isSafe ? '' : 'background-color: #fff3cd; opacity: 0.7;';
+        
         const row = document.createElement('tr');
+        row.style.cssText = rowStyle;
+        
+        // Afficher une icône de sécurité
+        const safetyIcon = isSafe ? 
+            '<span style="color: #28a745;" title="Sûr à supprimer (téléchargement terminé)">✅</span>' :
+            '<span style="color: #ffc107;" title="Protégé automatiquement (en cours ou en erreur)">🛡️</span>';
+        
+        // Désactiver la case à cocher pour les torrents non-sûrs
+        const checkboxHtml = isSafe ? 
+            `<input type="checkbox" class="cleanup-torrent-checkbox" value="${torrent.id}" onchange="updateCleanupSelection()">` :
+            `<input type="checkbox" disabled title="Torrent protégé (statut: ${torrent.status})">`;
+        
         row.innerHTML = `
-            <td>
-                <input type="checkbox" class="cleanup-torrent-checkbox" 
-                       value="${torrent.id}" onchange="updateCleanupSelection()">
-            </td>
+            <td>${checkboxHtml}</td>
             <td>
                 <div style="max-width: 400px; overflow: hidden; text-overflow: ellipsis;" 
                      title="${torrent.name}">
@@ -854,9 +1083,12 @@ function displayCleanupResults(data) {
                 }
             </td>
             <td>
-                <span class="badge ${torrent.status === 'downloaded' ? 'badge-success' : 'badge-secondary'}">
+                <span class="badge ${getStatusBadgeClass(torrent.status)}">
                     ${torrent.status || 'unknown'}
                 </span>
+            </td>
+            <td style="text-align: center;">
+                ${safetyIcon}
             </td>
         `;
         tbody.appendChild(row);
@@ -867,6 +1099,21 @@ function displayCleanupResults(data) {
     // Réinitialiser la sélection
     selectedCleanupTorrents.clear();
     updateCleanupSelection();
+}
+
+// Fonction utilitaire pour les classes de badges de statut
+function getStatusBadgeClass(status) {
+    if (!status) return 'badge-secondary';
+    
+    const activeStatuses = ['downloading', 'queued', 'waiting_files_selection', 'magnet_conversion', 'uploading', 'compressing', 'waiting'];
+    const errorStatuses = ['error', 'magnet_error', 'virus', 'dead', 'timeout', 'hoster_unavailable'];
+    const completedStatuses = ['downloaded', 'finished'];
+    
+    if (completedStatuses.includes(status)) return 'badge-success';
+    if (activeStatuses.includes(status)) return 'badge-warning';
+    if (errorStatuses.includes(status)) return 'badge-danger';
+    
+    return 'badge-secondary';
 }
 
 function updateCleanupSelection() {
@@ -1066,6 +1313,9 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Vérifier s'il y a des scans en cours
     checkRunningScans();
+    
+    // Charger les analyses actives pour reprendre celles en cours
+    loadActiveAnalyses();
 });
 
 // Nettoyage avant fermeture
