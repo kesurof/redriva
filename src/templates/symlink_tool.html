@@ -408,17 +408,17 @@
 <div class="tabs-container">
     <!-- Navigation des onglets -->
     <div class="tabs-nav">
-        <button class="tab-btn active" onclick="switchTab('dashboard')">
-            🏠 Dashboard
+                <button class="tab-btn active" onclick="switchTab('dashboard', this)">
+            📊 Dashboard
         </button>
-        <button class="tab-btn" onclick="switchTab('scanner')">
+        <button class="tab-btn" onclick="switchTab('scanner', this)">
             🔍 Scanner
         </button>
-        <button class="tab-btn" onclick="switchTab('cleanup')">
-            🗑️ Cleanup
+        <button class="tab-btn" onclick="switchTab('cleanup', this)">
+            🧹 Cleanup Torrents
         </button>
-        <button class="tab-btn" onclick="switchTab('settings')">
-            ⚙️ Settings
+        <button class="tab-btn" onclick="switchTab('settings', this)">
+            ⚙️ Paramètres
         </button>
     </div>
     
@@ -433,7 +433,7 @@
                     Prêt
                 </div>
                 <div style="margin-top: 20px;">
-                    <button class="btn btn-success" onclick="switchTab('scanner')">
+                    <button class="btn btn-success" onclick="switchTab('scanner', this)">
                         🚀 Nouveau scan
                     </button>
                 </div>

@@ -384,12 +384,13 @@ class TorrentCleanupAnalyzer:
             # 2. Récupérer tous les torrents RD depuis la base principale
             with sqlite3.connect(DB_PATH) as conn:
                 c = conn.cursor()
+                # Requête corrigée pour gérer les dates ISO
                 c.execute("""
-                    SELECT t.id, t.filename, t.bytes, t.added, td.name, t.status
+                    SELECT t.id, t.filename, t.bytes, t.added_on, td.name, t.status
                     FROM torrents t
                     LEFT JOIN torrent_details td ON t.id = td.id
                     WHERE t.status != 'deleted'
-                    AND datetime(t.added) <= datetime('now', '-{} days')
+                    AND (datetime(t.added_on) <= datetime('now', '-{} days') OR t.added_on IS NULL)
                 """.format(self.min_age_days))
                 
                 torrents = c.fetchall()

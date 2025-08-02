@@ -17,7 +17,7 @@ let cleanupAnalysisData = null;
 // GESTION DES ONGLETS
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function switchTab(tabName) {
+function switchTab(tabName, buttonElement) {
     // Masquer tous les onglets
     document.querySelectorAll('.tab-pane').forEach(pane => {
         pane.classList.remove('active');
@@ -29,8 +29,15 @@ function switchTab(tabName) {
     });
     
     // Afficher l'onglet sélectionné
-    document.getElementById(tabName + '-tab').classList.add('active');
-    event.target.classList.add('active');
+    const targetTab = document.getElementById(tabName + '-tab');
+    if (targetTab) {
+        targetTab.classList.add('active');
+    }
+    
+    // Activer le bouton d'onglet si fourni
+    if (buttonElement && buttonElement.classList) {
+        buttonElement.classList.add('active');
+    }
     
     // Charger les données selon l'onglet
     switch(tabName) {
@@ -1046,14 +1053,15 @@ document.addEventListener('DOMContentLoaded', function() {
     const savedTab = localStorage.getItem('symlink_active_tab');
     if (savedTab && document.getElementById(savedTab + '-tab')) {
         // Simuler le clic sur l'onglet sauvegardé
-        const tabBtn = document.querySelector(`[onclick="switchTab('${savedTab}')"]`);
+        const tabBtn = document.querySelector(`[onclick*="switchTab('${savedTab}')"]`);
         if (tabBtn) {
+            switchTab(savedTab, tabBtn);
+        } else {
             switchTab(savedTab);
-            tabBtn.classList.add('active');
         }
     } else {
         // Charger le dashboard par défaut
-        loadDashboard();
+        switchTab('dashboard');
     }
     
     // Vérifier s'il y a des scans en cours
