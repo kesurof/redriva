@@ -15,9 +15,11 @@ import json
 import logging
 import subprocess
 import asyncio
+import re
+import requests
 from datetime import datetime
 from pathlib import Path
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional, Tuple, Set
 from concurrent.futures import ThreadPoolExecutor
 from flask import Flask, request, jsonify, render_template
 
@@ -83,7 +85,7 @@ def init_symlink_database():
         )
     ''')
     
-    # Insérer une configuration par défaut si elle n'existe pas
+        # Insérer une configuration par défaut si elle n'existe pas
     cursor.execute('SELECT COUNT(*) FROM symlink_config')
     if cursor.fetchone()[0] == 0:
         cursor.execute('''
@@ -91,13 +93,533 @@ def init_symlink_database():
             VALUES ('/app/medias', 6)
         ''')
     
+    # Ajouter les nouvelles colonnes pour le cleanup (ALTER TABLE si nécessaire)
+    cleanup_columns = [
+        ('cleanup_enabled', 'BOOLEAN DEFAULT 0'),
+        ('zurg_path', 'TEXT DEFAULT "/home/kesurof/seedbox/zurg/__all__"'),
+        ('cleanup_min_age_days', 'INTEGER DEFAULT 2'),
+        ('cleanup_min_size_mb', 'INTEGER DEFAULT 0'),
+        ('organized_media_path', 'TEXT DEFAULT "/app/medias"'),
+        ('cleanup_dry_run_default', 'BOOLEAN DEFAULT 1'),
+        ('rd_api_key', 'TEXT DEFAULT ""'),
+        ('cleanup_batch_limit', 'INTEGER DEFAULT 20'),
+        ('cleanup_delay_ms', 'INTEGER DEFAULT 1000'),
+        ('cleanup_ignore_extensions', 'TEXT DEFAULT ".nfo,.txt,.srt,.jpg,.png,.xml"'),
+        ('cleanup_whitelist', 'TEXT DEFAULT ""'),
+        ('cleanup_match_threshold', 'INTEGER DEFAULT 80'),
+        ('cleanup_max_workers', 'INTEGER DEFAULT 4'),
+        ('cleanup_preserve_recent', 'BOOLEAN DEFAULT 1'),
+        ('cleanup_detailed_logs', 'BOOLEAN DEFAULT 0'),
+        ('cleanup_auto_schedule', 'BOOLEAN DEFAULT 0')
+    ]
+    
+    for column_name, column_def in cleanup_columns:
+        try:
+            cursor.execute(f'ALTER TABLE symlink_config ADD COLUMN {column_name} {column_def}')
+        except sqlite3.OperationalError:
+            # Colonne déjà existante
+            pass
+    
     conn.commit()
     conn.close()
-    logger.info("Base de données symlink initialisée")
+    logger.info("Base de données symlink initialisée avec configuration cleanup")
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # ADAPTATION DE LA CLASSE AdvancedSymlinkChecker
 # ═══════════════════════════════════════════════════════════════════════════════
+
+class WebSymlinkChecker:
+    """Version adaptée d'AdvancedSymlinkChecker pour l'interface web"""
+    
+    def __init__(self, max_workers=6, progress_callback=None):
+        self.max_workers = max_workers
+        self.progress_callback = progress_callback or (lambda x: None)
+        self.stop_requested = False
+        self.current_stats = {
+            'phase': 'idle',
+            'progress': 0,
+            'current_file': '',
+            'phase1_ok': 0,
+            'phase1_broken': 0,
+            'phase1_inaccessible': 0,
+            'phase1_small': 0,
+            'phase1_io_error': 0,
+            'phase2_analyzed': 0,
+            'phase2_corrupted': 0
+        }
+    
+    def update_progress(self, message, **kwargs):
+        """Met à jour le statut de progression"""
+        for key, value in kwargs.items():
+            if key in self.current_stats:
+                self.current_stats[key] = value
+        
+        self.current_stats['current_file'] = message
+        self.progress_callback(self.current_stats)
+    
+    def scan_directory_structure(self, base_path: str) -> List[Dict]:
+        """Analyse la structure des répertoires pour identifier les chemins de scan"""
+        directories = []
+        
+        try:
+            if os.path.exists(base_path):
+                for item in os.listdir(base_path):
+                    item_path = os.path.join(base_path, item)
+                    if os.path.isdir(item_path):
+                        directories.append({
+                            'name': item,
+                            'path': item_path,
+                            'type': 'directory'
+                        })
+        except Exception as e:
+            logger.error(f"Erreur scan structure: {e}")
+        
+        return directories
+    
+    def phase1_scan(self, selected_paths: List[str]) -> Tuple[List[str], List[Dict]]:
+        """Phase 1: Scan basique des liens symboliques"""
+        ok_files = []
+        problems = []
+        
+        for path in selected_paths:
+            try:
+                if os.path.islink(path):
+                    target = os.readlink(path)
+                    if os.path.exists(target):
+                        ok_files.append(path)
+                        self.current_stats['phase1_ok'] += 1
+                    else:
+                        problems.append({
+                            'file': path,
+                            'type': 'broken_link',
+                            'target': target,
+                            'reason': 'Target does not exist'
+                        })
+                        self.current_stats['phase1_broken'] += 1
+            except Exception as e:
+                problems.append({
+                    'file': path,
+                    'type': 'error',
+                    'reason': str(e)
+                })
+                self.current_stats['phase1_io_error'] += 1
+        
+        return ok_files, problems
+    
+    def phase2_scan(self, ok_files: List[str]) -> List[Dict]:
+        """Phase 2: Vérification avancée (optionnelle)"""
+        corrupted = []
+        
+        for file_path in ok_files:
+            self.current_stats['phase2_analyzed'] += 1
+            # Pour l'instant, pas de vérification avancée
+            # Cette fonction peut être étendue pour des vérifications média
+        
+        return corrupted
+    
+    def delete_files(self, problems: List[Dict]) -> List[Dict]:
+        """Supprime les fichiers problématiques"""
+        deleted = []
+        
+        for problem in problems:
+            try:
+                file_path = problem['file']
+                if os.path.exists(file_path) or os.path.islink(file_path):
+                    os.unlink(file_path)
+                    deleted.append(problem)
+                    logger.info(f"Fichier supprimé: {file_path}")
+            except Exception as e:
+                logger.error(f"Erreur suppression {file_path}: {e}")
+                problem['delete_error'] = str(e)
+        
+        return deleted
+        
+    
+    def get_container_ip(self, container_id: str, network: str = None) -> Optional[str]:
+        """Récupère l'IP d'un conteneur Docker"""
+        # Implémentation basique
+        return None
+
+    def get_api_key(self, service: str, custom_path: str = None) -> Optional[str]:
+        """Récupère la clé API pour un service donné"""
+        # Implémentation basique - peut être étendue
+        return None
+
+    def detect_docker_services(self) -> Dict:
+        """Détecte automatiquement les services Sonarr/Radarr via Docker"""
+        services = {'sonarr': None, 'radarr': None}
+        
+        try:
+            # Test simple de détection Docker
+            result = subprocess.run(['docker', 'ps'], capture_output=True, text=True, timeout=10)
+            if result.returncode == 0:
+                # Docker est accessible
+                lines = result.stdout.split('\n')
+                for line in lines:
+                    if 'sonarr' in line.lower():
+                        services['sonarr'] = {'host': 'localhost', 'port': 8989, 'detected': True}
+                    if 'radarr' in line.lower():
+                        services['radarr'] = {'host': 'localhost', 'port': 7878, 'detected': True}
+            
+        except Exception as e:
+            logger.warning(f"Erreur détection Docker: {e}")
+        
+        return services
+
+    def trigger_media_scans(self, config: Dict):
+        """Déclenche des scans sur Sonarr/Radarr"""
+        try:
+            if config.get('sonarr_enabled'):
+                self._trigger_sonarr_scan(config)
+            if config.get('radarr_enabled'):
+                self._trigger_radarr_scan(config)
+        except Exception as e:
+            logger.error(f"Erreur déclenchement scans: {e}")
+    
+    def _trigger_sonarr_scan(self, config: Dict):
+        """Déclenche un scan Sonarr"""
+        # Implémentation basique
+        pass
+        
+    
+    def _trigger_radarr_scan(self, config: Dict):
+        """Déclenche un scan Radarr"""
+        # Implémentation basique
+        pass
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# CLASSE DE NETTOYAGE DES TORRENTS REAL-DEBRID
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class TorrentCleanupAnalyzer:
+    """Analyseur et nettoyeur de torrents Real-Debrid inutilisés"""
+    
+    def __init__(self, config: Dict = None):
+        """Initialise l'analyseur avec la configuration"""
+        self.config = config or self._load_cleanup_config()
+        self.zurg_path = self.config.get('zurg_path', '/home/kesurof/seedbox/zurg/__all__')
+        self.min_age_days = self.config.get('cleanup_min_age_days', 2)
+        self.min_size_mb = self.config.get('cleanup_min_size_mb', 0)
+        self.organized_media_path = self.config.get('organized_media_path', '/app/medias')
+        self.match_threshold = self.config.get('cleanup_match_threshold', 80)
+        self.detailed_logs = self.config.get('cleanup_detailed_logs', False)
+        
+    def _load_cleanup_config(self) -> Dict:
+        """Charge la configuration cleanup depuis la base de données"""
+        try:
+            conn = sqlite3.connect(SYMLINK_DB_PATH)
+            cursor = conn.cursor()
+            cursor.execute('SELECT * FROM symlink_config LIMIT 1')
+            row = cursor.fetchone()
+            
+            if row:
+                columns = [description[0] for description in cursor.description]
+                config = dict(zip(columns, row))
+                conn.close()
+                return config
+            else:
+                conn.close()
+                return {}
+        except Exception as e:
+            logger.error(f"Erreur chargement config cleanup: {e}")
+            return {}
+    
+    def scan_zurg_usage(self) -> set:
+        """Analyse les torrents utilisés via Zurg"""
+        used_torrents = set()
+        
+        try:
+            if not os.path.exists(self.zurg_path):
+                logger.warning(f"Chemin Zurg inexistant: {self.zurg_path}")
+                return used_torrents
+            
+            # Lister tous les dossiers dans Zurg
+            for item in os.listdir(self.zurg_path):
+                item_path = os.path.join(self.zurg_path, item)
+                if os.path.isdir(item_path):
+                    # Nettoyer le nom pour correspondance
+                    clean_name = self.normalize_torrent_name(item)
+                    used_torrents.add(clean_name)
+                    
+                    if self.detailed_logs:
+                        logger.debug(f"Torrent Zurg trouvé: {item} -> {clean_name}")
+                    
+        except Exception as e:
+            logger.error(f"Erreur scan Zurg: {e}")
+            
+        logger.info(f"Trouvé {len(used_torrents)} torrents utilisés dans Zurg")
+        return used_torrents
+    
+    def normalize_torrent_name(self, name: str) -> str:
+        """Normalise un nom de torrent pour la comparaison"""
+        # Supprimer extensions courantes
+        name = re.sub(r'\.(mkv|mp4|avi|mov|wmv|flv|webm)$', '', name, flags=re.IGNORECASE)
+        # Normaliser les espaces/tirets/underscores
+        name = re.sub(r'[.\-_]+', ' ', name)
+        # Supprimer espaces multiples
+        name = re.sub(r'\s+', ' ', name.strip())
+        # Supprimer les caractères spéciaux et parenthèses
+        name = re.sub(r'[(){}\[\]]+', ' ', name)
+        # Normaliser en minuscules
+        return name.lower().strip()
+    
+    def calculate_similarity(self, name1: str, name2: str) -> float:
+        """Calcule le pourcentage de similarité entre deux noms"""
+        try:
+            from difflib import SequenceMatcher
+            return SequenceMatcher(None, name1, name2).ratio() * 100
+        except ImportError:
+            # Fallback simple si difflib non disponible
+            return 100.0 if name1 == name2 else 0.0
+    
+    def find_unused_torrents(self) -> List[Dict]:
+        """Identifie les torrents RD inutilisés"""
+        unused_torrents = []
+        
+        try:
+            # 1. Scanner les torrents utilisés dans Zurg
+            used_torrents = self.scan_zurg_usage()
+            
+            # 2. Récupérer tous les torrents RD depuis la base principale
+            with sqlite3.connect(DB_PATH) as conn:
+                c = conn.cursor()
+                c.execute("""
+                    SELECT t.id, t.filename, t.bytes, t.added, td.name, t.status
+                    FROM torrents t
+                    LEFT JOIN torrent_details td ON t.id = td.id
+                    WHERE t.status != 'deleted'
+                    AND datetime(t.added) <= datetime('now', '-{} days')
+                """.format(self.min_age_days))
+                
+                torrents = c.fetchall()
+            
+            # 3. Comparer et identifier les orphelins
+            for torrent in torrents:
+                torrent_id, filename, bytes_size, added_on, detail_name, status = torrent
+                
+                # Utiliser le nom détaillé si disponible, sinon le filename
+                name_to_check = detail_name or filename
+                normalized_rd_name = self.normalize_torrent_name(name_to_check)
+                
+                # Vérifier la taille minimum si configurée
+                if self.min_size_mb > 0 and bytes_size:
+                    size_mb = bytes_size / (1024 * 1024)
+                    if size_mb < self.min_size_mb:
+                        continue
+                
+                # Vérifier si utilisé (correspondance avec seuil de similarité)
+                is_used = False
+                best_match_score = 0
+                best_match_name = ""
+                
+                for used_name in used_torrents:
+                    similarity = self.calculate_similarity(normalized_rd_name, used_name)
+                    if similarity > best_match_score:
+                        best_match_score = similarity
+                        best_match_name = used_name
+                    
+                    if similarity >= self.match_threshold:
+                        is_used = True
+                        break
+                
+                if not is_used:
+                    unused_torrents.append({
+                        'id': torrent_id,
+                        'name': name_to_check,
+                        'filename': filename,
+                        'size': bytes_size,
+                        'size_formatted': self._format_size(bytes_size) if bytes_size else 'N/A',
+                        'added_on': added_on,
+                        'status': status,
+                        'age_days': self.calculate_age_days(added_on),
+                        'best_match': best_match_name,
+                        'best_match_score': round(best_match_score, 1)
+                    })
+                    
+                    if self.detailed_logs:
+                        logger.debug(f"Torrent orphelin: {name_to_check} (meilleure correspondance: {best_match_name} à {best_match_score}%)")
+            
+        except Exception as e:
+            logger.error(f"Erreur recherche torrents inutilisés: {e}")
+        
+        logger.info(f"Trouvé {len(unused_torrents)} torrents orphelins")
+        return unused_torrents
+    
+    def calculate_age_days(self, added_on: str) -> int:
+        """Calcule l'âge d'un torrent en jours"""
+        try:
+            from datetime import datetime
+            
+            # Gérer différents formats de date
+            for fmt in ('%Y-%m-%d %H:%M:%S', '%Y-%m-%dT%H:%M:%S', '%Y-%m-%dT%H:%M:%SZ'):
+                try:
+                    added_date = datetime.strptime(added_on.replace('Z', ''), fmt.replace('Z', ''))
+                    now = datetime.now()
+                    return (now - added_date).days
+                except ValueError:
+                    continue
+            
+            # Si aucun format ne fonctionne, retourner 0
+            logger.warning(f"Format de date non reconnu: {added_on}")
+            return 0
+            
+        except Exception as e:
+            logger.error(f"Erreur calcul âge torrent: {e}")
+            return 0
+    
+    def _format_size(self, bytes_size: int) -> str:
+        """Formate une taille en bytes en format lisible"""
+        if not bytes_size:
+            return "0 B"
+        
+        for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+            if bytes_size < 1024.0:
+                return f"{bytes_size:.1f} {unit}"
+            bytes_size /= 1024.0
+        return f"{bytes_size:.1f} PB"
+    
+    def delete_torrents_via_rd_api(self, torrent_ids: List[str], api_key: str) -> Dict:
+        """Supprime les torrents via l'API Real-Debrid"""
+        results = {
+            'success': 0,
+            'failed': 0,
+            'errors': []
+        }
+        
+        if not api_key:
+            results['errors'].append('API key Real-Debrid manquante')
+            return results
+        
+        delay_ms = self.config.get('cleanup_delay_ms', 1000)
+        
+        try:
+            import requests
+            import time
+            
+            headers = {
+                'Authorization': f'Bearer {api_key}'
+            }
+            
+            for torrent_id in torrent_ids:
+                try:
+                    # Supprimer le torrent via API RD
+                    response = requests.delete(
+                        f'https://api.real-debrid.com/rest/1.0/torrents/delete/{torrent_id}',
+                        headers=headers,
+                        timeout=30
+                    )
+                    
+                    if response.status_code == 204:  # Succès Real-Debrid
+                        results['success'] += 1
+                        logger.info(f"Torrent {torrent_id} supprimé avec succès")
+                        
+                        # Marquer comme supprimé dans la DB locale
+                        self._mark_torrent_as_deleted(torrent_id)
+                        
+                    else:
+                        results['failed'] += 1
+                        error_msg = f"Erreur API RD {response.status_code}: {response.text}"
+                        results['errors'].append({'torrent_id': torrent_id, 'error': error_msg})
+                        logger.error(f"Erreur suppression {torrent_id}: {error_msg}")
+                    
+                    # Délai entre les appels
+                    time.sleep(delay_ms / 1000.0)
+                    
+                except Exception as e:
+                    results['failed'] += 1
+                    error_msg = str(e)
+                    results['errors'].append({'torrent_id': torrent_id, 'error': error_msg})
+                    logger.error(f"Exception suppression {torrent_id}: {error_msg}")
+                    
+        except Exception as e:
+            results['errors'].append(f"Erreur générale suppression: {e}")
+            logger.error(f"Erreur générale suppression torrents: {e}")
+        
+        return results
+    
+    def _mark_torrent_as_deleted(self, torrent_id: str):
+        """Marque un torrent comme supprimé dans la base locale"""
+        try:
+            with sqlite3.connect(DB_PATH) as conn:
+                c = conn.cursor()
+                c.execute(
+                    "UPDATE torrents SET status = 'deleted' WHERE id = ?",
+                    (torrent_id,)
+                )
+                conn.commit()
+                logger.debug(f"Torrent {torrent_id} marqué comme supprimé en local")
+        except Exception as e:
+            logger.error(f"Erreur mise à jour statut torrent {torrent_id}: {e}")
+    
+    def test_zurg_connection(self) -> Dict:
+        """Teste la connexion au montage Zurg"""
+        try:
+            if not os.path.exists(self.zurg_path):
+                return {
+                    'success': False,
+                    'error': f'Chemin Zurg inaccessible: {self.zurg_path}'
+                }
+            
+            # Compter les torrents disponibles
+            torrent_count = 0
+            for item in os.listdir(self.zurg_path):
+                item_path = os.path.join(self.zurg_path, item)
+                if os.path.isdir(item_path):
+                    torrent_count += 1
+            
+            return {
+                'success': True,
+                'torrents_found': torrent_count,
+                'message': f'Zurg accessible avec {torrent_count} torrents'
+            }
+            
+        except Exception as e:
+            return {
+                'success': False,
+                'error': f'Erreur test Zurg: {str(e)}'
+            }
+    
+    def test_realdebrid_connection(self, api_key: str) -> Dict:
+        """Teste la connexion à l'API Real-Debrid"""
+        try:
+            import requests
+            
+            if not api_key:
+                return {
+                    'success': False,
+                    'error': 'API key Real-Debrid manquante'
+                }
+            
+            headers = {
+                'Authorization': f'Bearer {api_key}'
+            }
+            
+            # Test avec l'endpoint user
+            response = requests.get(
+                'https://api.real-debrid.com/rest/1.0/user',
+                headers=headers,
+                timeout=10
+            )
+            
+            if response.status_code == 200:
+                user_data = response.json()
+                return {
+                    'success': True,
+                    'user_info': f"Connecté en tant que {user_data.get('username', 'Utilisateur')}",
+                    'premium_until': user_data.get('expiration', 'N/A')
+                }
+            else:
+                return {
+                    'success': False,
+                    'error': f'Erreur API RD {response.status_code}: {response.text}'
+                }
+                
+        except Exception as e:
+            return {
+                'success': False,
+                'error': f'Erreur connexion Real-Debrid: {str(e)}'
+            }
 
 class WebSymlinkChecker:
     """Version adaptée d'AdvancedSymlinkChecker pour l'interface web"""
@@ -1032,6 +1554,212 @@ def register_symlink_routes(app: Flask):
             
         except Exception as e:
             return jsonify({'success': False, 'error': str(e)}), 500
+    
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # NOUVELLES ROUTES POUR LE CLEANUP DES TORRENTS
+    # ═══════════════════════════════════════════════════════════════════════════════
+    
+    @app.route('/api/symlink/cleanup/config', methods=['GET'])
+    def get_cleanup_config():
+        """Récupère la configuration cleanup des torrents"""
+        try:
+            conn = sqlite3.connect(SYMLINK_DB_PATH)
+            cursor = conn.cursor()
+            cursor.execute('SELECT * FROM symlink_config LIMIT 1')
+            row = cursor.fetchone()
+            
+            if row:
+                columns = [description[0] for description in cursor.description]
+                config = dict(zip(columns, row))
+                conn.close()
+                
+                # Extraire seulement les paramètres cleanup
+                cleanup_config = {
+                    'cleanup_enabled': bool(config.get('cleanup_enabled', False)),
+                    'zurg_path': config.get('zurg_path', '/home/kesurof/seedbox/zurg/__all__'),
+                    'cleanup_min_age_days': config.get('cleanup_min_age_days', 2),
+                    'cleanup_min_size_mb': config.get('cleanup_min_size_mb', 0),
+                    'organized_media_path': config.get('organized_media_path', '/app/medias'),
+                    'cleanup_dry_run_default': bool(config.get('cleanup_dry_run_default', True)),
+                    'rd_api_key': config.get('rd_api_key', ''),
+                    'cleanup_batch_limit': config.get('cleanup_batch_limit', 20),
+                    'cleanup_delay_ms': config.get('cleanup_delay_ms', 1000),
+                    'cleanup_ignore_extensions': config.get('cleanup_ignore_extensions', '.nfo,.txt,.srt,.jpg,.png,.xml'),
+                    'cleanup_whitelist': config.get('cleanup_whitelist', ''),
+                    'cleanup_match_threshold': config.get('cleanup_match_threshold', 80),
+                    'cleanup_max_workers': config.get('cleanup_max_workers', 4),
+                    'cleanup_preserve_recent': bool(config.get('cleanup_preserve_recent', True)),
+                    'cleanup_detailed_logs': bool(config.get('cleanup_detailed_logs', False)),
+                    'cleanup_auto_schedule': bool(config.get('cleanup_auto_schedule', False))
+                }
+                
+                return jsonify({'success': True, 'config': cleanup_config})
+            else:
+                conn.close()
+                return jsonify({'success': False, 'error': 'Configuration non trouvée'})
+                
+        except Exception as e:
+            logger.error(f"Erreur récupération config cleanup: {e}")
+            return jsonify({'success': False, 'error': str(e)}), 500
+
+    @app.route('/api/symlink/cleanup/config', methods=['POST'])
+    def save_cleanup_config():
+        """Sauvegarde la configuration cleanup des torrents"""
+        try:
+            data = request.get_json()
+            
+            conn = sqlite3.connect(SYMLINK_DB_PATH)
+            cursor = conn.cursor()
+            
+            # Mise à jour des paramètres cleanup
+            update_fields = []
+            update_values = []
+            
+            cleanup_fields = [
+                'cleanup_enabled', 'zurg_path', 'cleanup_min_age_days', 'cleanup_min_size_mb',
+                'organized_media_path', 'cleanup_dry_run_default', 'rd_api_key',
+                'cleanup_batch_limit', 'cleanup_delay_ms', 'cleanup_ignore_extensions',
+                'cleanup_whitelist', 'cleanup_match_threshold', 'cleanup_max_workers',
+                'cleanup_preserve_recent', 'cleanup_detailed_logs', 'cleanup_auto_schedule'
+            ]
+            
+            for field in cleanup_fields:
+                if field in data:
+                    update_fields.append(f"{field} = ?")
+                    # Conversion des booléens
+                    if field in ['cleanup_enabled', 'cleanup_dry_run_default', 'cleanup_preserve_recent', 
+                                'cleanup_detailed_logs', 'cleanup_auto_schedule']:
+                        update_values.append(1 if data[field] else 0)
+                    else:
+                        update_values.append(data[field])
+            
+            if update_fields:
+                update_fields.append("updated_at = CURRENT_TIMESTAMP")
+                update_query = f"UPDATE symlink_config SET {', '.join(update_fields)}"
+                cursor.execute(update_query, update_values)
+                conn.commit()
+            
+            conn.close()
+            
+            return jsonify({'success': True, 'message': 'Configuration cleanup sauvegardée'})
+            
+        except Exception as e:
+            logger.error(f"Erreur sauvegarde config cleanup: {e}")
+            return jsonify({'success': False, 'error': str(e)}), 500
+    
+    @app.route('/api/symlink/cleanup/analyze', methods=['POST'])
+    def analyze_unused_torrents():
+        """Analyse les torrents Real-Debrid inutilisés"""
+        try:
+            data = request.get_json() or {}
+            dry_run = data.get('dry_run', True)
+            
+            analyzer = TorrentCleanupAnalyzer()
+            unused_torrents = analyzer.find_unused_torrents()
+            
+            # Statistiques
+            total_size = sum(t.get('size', 0) for t in unused_torrents if t.get('size'))
+            
+            return jsonify({
+                'success': True,
+                'dry_run': dry_run,
+                'unused_torrents': unused_torrents,
+                'stats': {
+                    'total_unused': len(unused_torrents),
+                    'total_size': total_size,
+                    'total_size_formatted': analyzer._format_size(total_size),
+                    'analyzed_at': datetime.now().isoformat(),
+                    'zurg_path': analyzer.zurg_path,
+                    'min_age_days': analyzer.min_age_days
+                }
+            })
+            
+        except Exception as e:
+            logger.error(f"Erreur analyse cleanup: {e}")
+            return jsonify({'success': False, 'error': str(e)}), 500
+    
+    @app.route('/api/symlink/cleanup/delete', methods=['POST'])
+    def cleanup_unused_torrents():
+        """Supprime les torrents sélectionnés de Real-Debrid"""
+        try:
+            data = request.get_json()
+            torrent_ids = data.get('torrent_ids', [])
+            dry_run = data.get('dry_run', True)
+            
+            if not torrent_ids:
+                return jsonify({'success': False, 'error': 'Aucun torrent sélectionné'}), 400
+            
+            if dry_run:
+                return jsonify({
+                    'success': True,
+                    'dry_run': True,
+                    'message': f'Mode simulation : {len(torrent_ids)} torrents seraient supprimés'
+                })
+            
+            # Récupérer l'API key depuis la configuration
+            analyzer = TorrentCleanupAnalyzer()
+            api_key = analyzer.config.get('rd_api_key', '')
+            
+            if not api_key:
+                return jsonify({
+                    'success': False,
+                    'error': 'API key Real-Debrid non configurée'
+                }), 400
+            
+            # Suppression réelle via l'API RD
+            results = analyzer.delete_torrents_via_rd_api(torrent_ids, api_key)
+            
+            return jsonify({
+                'success': True,
+                'dry_run': False,
+                'deleted_count': results['success'],
+                'failed_count': results['failed'],
+                'errors': results['errors'],
+                'message': f'{results["success"]} torrents supprimés avec succès'
+            })
+            
+        except Exception as e:
+            logger.error(f"Erreur cleanup suppression: {e}")
+            return jsonify({'success': False, 'error': str(e)}), 500
+    
+    @app.route('/api/symlink/test/zurg', methods=['POST'])
+    def test_zurg_connection():
+        """Teste la connexion au montage Zurg"""
+        try:
+            data = request.get_json()
+            zurg_path = data.get('zurg_path', '/home/kesurof/seedbox/zurg/__all__')
+            
+            # Créer un analyseur temporaire avec le chemin fourni
+            temp_config = {'zurg_path': zurg_path}
+            analyzer = TorrentCleanupAnalyzer(temp_config)
+            
+            result = analyzer.test_zurg_connection()
+            return jsonify(result)
+            
+        except Exception as e:
+            logger.error(f"Erreur test Zurg: {e}")
+            return jsonify({
+                'success': False,
+                'error': str(e)
+            }), 500
+    
+    @app.route('/api/symlink/test/realdebrid', methods=['POST'])
+    def test_realdebrid_connection():
+        """Teste la connexion à l'API Real-Debrid"""
+        try:
+            data = request.get_json()
+            api_key = data.get('api_key', '')
+            
+            analyzer = TorrentCleanupAnalyzer()
+            result = analyzer.test_realdebrid_connection(api_key)
+            return jsonify(result)
+            
+        except Exception as e:
+            logger.error(f"Erreur test Real-Debrid: {e}")
+            return jsonify({
+                'success': False,
+                'error': str(e)
+            }), 500
 
 # Initialisation au chargement du module
 init_symlink_database()

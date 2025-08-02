@@ -414,6 +414,9 @@
         <button class="tab-btn" onclick="switchTab('scanner')">
             🔍 Scanner
         </button>
+        <button class="tab-btn" onclick="switchTab('cleanup')">
+            🗑️ Cleanup
+        </button>
         <button class="tab-btn" onclick="switchTab('settings')">
             ⚙️ Settings
         </button>
@@ -562,6 +565,66 @@
             </div>
         </div>
         
+        <!-- Onglet Cleanup -->
+        <div id="cleanup-tab" class="tab-pane">
+            <h3>🗑️ Nettoyage des torrents Real-Debrid</h3>
+            <p>Identifie et supprime les torrents Real-Debrid qui ne sont plus utilisés sur votre serveur.</p>
+            
+            <!-- Actions -->
+            <div class="cleanup-actions" style="margin-bottom: 20px; display: flex; gap: 10px;">
+                <button onclick="analyzeUnusedTorrents(true)" class="btn btn-info" id="analyze-btn">
+                    🔍 Analyser (Dry-Run)
+                </button>
+                <button onclick="analyzeUnusedTorrents(false)" class="btn btn-warning" id="real-analyze-btn" style="display: none;">
+                    🗑️ Analyser pour suppression
+                </button>
+            </div>
+            
+            <!-- Statistiques -->
+            <div id="cleanup-stats" class="stats-summary" style="display: none;">
+                <!-- Rempli dynamiquement -->
+            </div>
+            
+            <!-- Tableau des résultats (réutilise le style des torrents) -->
+            <div class="card" id="cleanup-results" style="display: none;">
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th style="width: 3%;">
+                                    <input type="checkbox" id="selectAllCleanup" onchange="toggleSelectAllCleanup(this)">
+                                </th>
+                                <th>Nom du torrent</th>
+                                <th>Taille</th>
+                                <th>Âge</th>
+                                <th>Correspondance</th>
+                                <th>Statut</th>
+                            </tr>
+                        </thead>
+                        <tbody id="cleanup-torrents-list">
+                            <!-- Rempli dynamiquement -->
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- Actions de sélection -->
+                <div id="cleanup-selection-actions" style="display: none; margin-top: 15px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <strong id="cleanup-selection-count">0</strong> torrents sélectionnés
+                            (<strong id="cleanup-selection-size">0 B</strong>)
+                        </div>
+                        <div style="display: flex; gap: 10px;">
+                            <button onclick="clearCleanupSelection()" class="btn btn-secondary btn-sm">Désélectionner</button>
+                            <button onclick="confirmCleanupDeletion()" class="btn btn-danger" id="cleanup-delete-btn">
+                                🗑️ Supprimer la sélection
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
         <!-- Onglet Settings -->
         <div id="settings-tab" class="tab-pane">
             <h3>⚙️ Configuration</h3>
@@ -631,6 +694,112 @@
                 </button>
             </div>
             
+            <!-- Configuration Cleanup Real-Debrid -->
+            <div class="settings-section">
+                <h4>🗑️ Configuration Cleanup Torrents</h4>
+                <div class="checkbox-group">
+                    <input type="checkbox" id="cleanup-enabled">
+                    <label for="cleanup-enabled">Activer le nettoyage automatique des torrents</label>
+                </div>
+                <div class="form-group">
+                    <label>Chemin de montage Zurg</label>
+                    <input type="text" class="form-control" id="zurg-path" placeholder="/home/kesurof/seedbox/zurg/__all__">
+                    <small class="form-text text-muted">Chemin vers le répertoire de montage Zurg contenant tous les torrents</small>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Âge minimum (jours)</label>
+                        <input type="number" class="form-control" id="cleanup-min-age" min="1" max="365" value="2">
+                        <small class="form-text text-muted">Âge minimum avant qu'un torrent puisse être supprimé</small>
+                    </div>
+                    <div class="form-group">
+                        <label>Taille minimum (MB)</label>
+                        <input type="number" class="form-control" id="cleanup-min-size" min="0" value="0">
+                        <small class="form-text text-muted">Taille minimum pour considérer un torrent (0 = pas de limite)</small>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Chemin des médias organisés</label>
+                    <input type="text" class="form-control" id="organized-media-path" placeholder="/app/medias">
+                    <small class="form-text text-muted">Répertoire contenant vos médias organisés avec liens symboliques</small>
+                </div>
+                <div class="checkbox-group">
+                    <input type="checkbox" id="cleanup-dry-run-default" checked>
+                    <label for="cleanup-dry-run-default">Mode Dry-Run par défaut</label>
+                    <small class="form-text text-muted">Toujours démarrer en mode simulation pour la sécurité</small>
+                </div>
+                <button type="button" class="btn btn-info" onclick="testZurgConnection()">
+                    🔍 Tester l'accès Zurg
+                </button>
+            </div>
+            
+            <!-- Configuration Real-Debrid API -->
+            <div class="settings-section">
+                <h4>🔑 Configuration Real-Debrid</h4>
+                <div class="alert alert-info">
+                    <strong>Info:</strong> Ces paramètres réutilisent la configuration Real-Debrid existante de Redriva.
+                </div>
+                <div class="form-group">
+                    <label>API Key Real-Debrid</label>
+                    <input type="password" class="form-control" id="rd-api-key" placeholder="Clé API Real-Debrid">
+                    <small class="form-text text-muted">Utilisée pour supprimer les torrents orphelins</small>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Limite de suppression par session</label>
+                        <input type="number" class="form-control" id="cleanup-batch-limit" min="1" max="100" value="20">
+                        <small class="form-text text-muted">Nombre maximum de torrents à supprimer en une fois</small>
+                    </div>
+                    <div class="form-group">
+                        <label>Délai entre suppressions (ms)</label>
+                        <input type="number" class="form-control" id="cleanup-delay" min="100" max="5000" value="1000">
+                        <small class="form-text text-muted">Délai pour respecter les limites API Real-Debrid</small>
+                    </div>
+                </div>
+                <button type="button" class="btn btn-info" onclick="testRealDebridConnection()">
+                    🔍 Tester la connexion Real-Debrid
+                </button>
+            </div>
+            
+            <!-- Configuration avancée -->
+            <div class="settings-section">
+                <h4>⚙️ Configuration avancée Cleanup</h4>
+                <div class="form-group">
+                    <label>Extensions de fichiers à ignorer</label>
+                    <input type="text" class="form-control" id="cleanup-ignore-extensions" value=".nfo,.txt,.srt,.jpg,.png,.xml">
+                    <small class="form-text text-muted">Extensions séparées par des virgules</small>
+                </div>
+                <div class="form-group">
+                    <label>Whitelist de torrents (IDs ou noms partiels)</label>
+                    <textarea class="form-control" id="cleanup-whitelist" rows="3" placeholder="Entrez les IDs ou noms de torrents à ne jamais supprimer, un par ligne"></textarea>
+                    <small class="form-text text-muted">Torrents protégés contre la suppression automatique</small>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Seuil de correspondance (%)</label>
+                        <input type="number" class="form-control" id="cleanup-match-threshold" min="50" max="100" value="80">
+                        <small class="form-text text-muted">Pourcentage de similarité requis pour correspondance nom/fichier</small>
+                    </div>
+                    <div class="form-group">
+                        <label>Threads parallèles</label>
+                        <input type="number" class="form-control" id="cleanup-max-workers" min="1" max="10" value="4">
+                        <small class="form-text text-muted">Nombre de threads pour l'analyse parallèle</small>
+                    </div>
+                </div>
+                <div class="checkbox-group">
+                    <input type="checkbox" id="cleanup-preserve-recent">
+                    <label for="cleanup-preserve-recent">Préserver les torrents récents même s'ils semblent inutilisés</label>
+                </div>
+                <div class="checkbox-group">
+                    <input type="checkbox" id="cleanup-detailed-logs">
+                    <label for="cleanup-detailed-logs">Logs détaillés pour le debugging</label>
+                </div>
+                <div class="checkbox-group">
+                    <input type="checkbox" id="cleanup-auto-schedule">
+                    <label for="cleanup-auto-schedule">Programmer des nettoyages automatiques</label>
+                </div>
+            </div>
+            
             <!-- Actions -->
             <div class="btn-group">
                 <button class="btn btn-primary" onclick="saveConfiguration()">
@@ -641,6 +810,9 @@
                 </button>
                 <button class="btn btn-light" onclick="loadConfiguration()">
                     🔄 Recharger
+                </button>
+                <button class="btn btn-warning" onclick="resetToDefaults()">
+                    🔄 Réinitialiser
                 </button>
             </div>
         </div>
