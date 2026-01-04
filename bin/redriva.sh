@@ -1,68 +1,69 @@
-#!/bin/bash
+#!/usr/bin/env bash
 ################################################################################
-# Redriva CLI - Script Wrapper Shell
-# Responsabilité: Lancer le core Python avec paramètres corrects
-# Version: 3.0
-# Date: 2026-01-04
+# Redriva CLI - Wrapper Shell
+# Responsabilité unique :
+# - Résoudre le vrai chemin du projet (même via symlink)
+# - Valider l’environnement minimal
+# - Lancer le core Python
 ################################################################################
 
 set -Eeuo pipefail
 
-# ============================================================================
-# CONFIGURATION - Chemins et variables
-# ============================================================================
+# ==============================================================================
+# RÉSOLUTION DU CHEMIN RÉEL (ANTI-SYMLINK BUG)
+# ==============================================================================
 
-# Déterminer le répertoire du script (chemin absolu)
-SCRIPT_DIR="$(cd -P "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+resolve_script_path() {
+    local src="$1"
+    while [ -L "$src" ]; do
+        local dir
+        dir="$(cd -P "$(dirname "$src")" && pwd)"
+        src="$(readlink "$src")"
+        [[ "$src" != /* ]] && src="$dir/$src"
+    done
+    cd -P "$(dirname "$src")" && pwd
+}
 
-# Répertoire racine Redriva (parent de bin/)
+# Répertoire réel du script, même via /usr/local/bin/redriva
+SCRIPT_DIR="$(resolve_script_path "${BASH_SOURCE[0]}")"
+
+# Racine réelle du projet
 REDRIVA_HOME="$(cd -P "${SCRIPT_DIR}/.." && pwd)"
 
-# Répertoire lib contenant les modules Python
+# Core Python
 PYTHON_CORE="${REDRIVA_HOME}/bin/redriva-core.py"
 
-# Configuration utilisateur
-export REDRIVA_HOME
-export HOME_CONFIG="${HOME}/.redriva"
+# Répertoire utilisateur (aligné avec le core Python)
+export REDRIVA_USER_HOME="${HOME}/my_redriva"
 
-# ============================================================================
-# FONCTIONS UTILITAIRES
-# ============================================================================
+# ==============================================================================
+# LOGS
+# ==============================================================================
 
 log_error() {
     printf "\033[91m✗ %s\033[0m\n" "$1" >&2
     exit 1
 }
 
-log_info() {
-    printf "\033[96mℹ %s\033[0m\n" "$1" >&2
-}
+# ==============================================================================
+# VALIDATIONS
+# ==============================================================================
 
-# ============================================================================
-# VALIDATIONS - Préalables avant exécution
-# ============================================================================
+command -v python3 >/dev/null 2>&1 \
+    || log_error "Python 3 est requis mais non installé"
 
-# Vérifier que Python 3 est disponible
-if ! command -v python3 &> /dev/null; then
-    log_error "Python 3 n'est pas installé"
-fi
+command -v docker >/dev/null 2>&1 \
+    || log_error "Docker est requis mais non installé"
 
-# Vérifier que le core Python existe
-if [[ ! -f "${PYTHON_CORE}" ]]; then
-    log_error "Fichier core Python non trouvé: ${PYTHON_CORE}"
-fi
+[[ -f "${PYTHON_CORE}" ]] \
+    || log_error "Core Python introuvable: ${PYTHON_CORE}"
 
-# Vérifier que Docker est disponible
-if ! command -v docker &> /dev/null; then
-    log_error "Docker n'est pas installé"
-fi
+[[ -r "${PYTHON_CORE}" ]] \
+    || log_error "Droits insuffisants sur ${PYTHON_CORE}"
 
-# ============================================================================
-# EXÉCUTION - Lancer le core Python
-# ============================================================================
+# ==============================================================================
+# EXÉCUTION
+# ==============================================================================
 
-# Exporter les variables pour que Python les voit
 export PYTHONUNBUFFERED=1
-
-# Transmettre tous les arguments au script Python
 exec python3 "${PYTHON_CORE}" "$@"

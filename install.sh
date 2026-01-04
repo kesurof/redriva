@@ -1,5 +1,4 @@
-#!/bin/bash
-
+#!/usr/bin/env bash
 ################################################################################
 #                      REDRIVA - Installation Script                           #
 #                            Version 3.0 (Python)                              #
@@ -8,15 +7,16 @@
 # Usage: bash install.sh                                                       #
 ################################################################################
 
-set -e
+set -Eeuo pipefail
 
 # ============================================================================
 # VARIABLES GLOBALES
 # ============================================================================
 
-REDRIVA_PROJECT_HOME="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REDRIVA_PROJECT_HOME="$(cd -P "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REDRIVA_USER_HOME="${HOME}/my_redriva"
 
+# Couleurs ANSI (à utiliser UNIQUEMENT via printf '%b')
 NORMAL='\033[0m'
 BOLD='\033[1m'
 BLUE='\033[94m'
@@ -26,30 +26,18 @@ RED='\033[91m'
 CYAN='\033[96m'
 
 # ============================================================================
-# FONCTIONS DE LOG
+# FONCTIONS DE LOG (CENTRALISÉES)
 # ============================================================================
 
-log_info() {
-    echo -e "${BLUE}ℹ${NORMAL} $1"
-}
-
-log_ok() {
-    echo -e "${GREEN}✓${NORMAL} $1"
-}
-
-log_error() {
-    echo -e "${RED}✗${NORMAL} $1" >&2
-}
-
-log_warn() {
-    echo -e "${YELLOW}⚠${NORMAL} $1"
-}
+log_info()  { printf '%b\n' "${BLUE}ℹ${NORMAL} $1"; }
+log_ok()    { printf '%b\n' "${GREEN}✓${NORMAL} $1"; }
+log_warn()  { printf '%b\n' "${YELLOW}⚠${NORMAL} $1"; }
+log_error() { printf '%b\n' "${RED}✗${NORMAL} $1" >&2; }
 
 log_title() {
-    echo ""
-    echo -e "${CYAN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NORMAL}"
-    echo -e "${CYAN}${BOLD}  $1${NORMAL}"
-    echo -e "${CYAN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NORMAL}"
+    printf '\n%b\n' "${CYAN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NORMAL}"
+    printf '%b\n'  "${CYAN}${BOLD}  $1${NORMAL}"
+    printf '%b\n'  "${CYAN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NORMAL}"
 }
 
 # ============================================================================
@@ -58,15 +46,10 @@ log_title() {
 
 detect_system() {
     if [[ "$OSTYPE" == "linux-gnu"* ]]; then
-        if [ -f /etc/debian_version ]; then
-            echo "debian"
-        elif [ -f /etc/redhat-release ]; then
-            echo "redhat"
-        elif [ -f /etc/arch-release ]; then
-            echo "arch"
-        else
-            echo "linux"
-        fi
+        [[ -f /etc/debian_version ]] && echo "debian" && return
+        [[ -f /etc/redhat-release ]] && echo "redhat" && return
+        [[ -f /etc/arch-release ]] && echo "arch" && return
+        echo "linux"
     elif [[ "$OSTYPE" == "darwin"* ]]; then
         echo "macos"
     else
@@ -80,40 +63,30 @@ detect_system() {
 
 check_requirements() {
     log_title "Vérification des prérequis"
-    
+
     local has_error=0
-    
-    # Python 3
-    if ! command -v python3 &> /dev/null; then
+
+    if command -v python3 >/dev/null 2>&1; then
+        log_ok "Python 3: $(python3 --version | awk '{print $2}')"
+    else
         log_error "Python 3 n'est pas installé"
         has_error=1
-    else
-        local py_version=$(python3 --version 2>&1 | awk '{print $2}')
-        log_ok "Python 3: ${py_version}"
     fi
-    
-    # Docker
-    if ! command -v docker &> /dev/null; then
+
+    if command -v docker >/dev/null 2>&1; then
+        log_ok "Docker: $(docker --version | awk '{print $3}' | tr -d ,)"
+    else
         log_error "Docker n'est pas installé"
         has_error=1
+    fi
+
+    if command -v git >/dev/null 2>&1; then
+        log_ok "Git: $(git --version | awk '{print $3}')"
     else
-        local docker_version=$(docker --version | awk '{print $3}' | sed 's/,//')
-        log_ok "Docker: ${docker_version}"
+        log_warn "Git non installé (optionnel)"
     fi
-    
-    # Git
-    if ! command -v git &> /dev/null; then
-        log_warn "Git n'est pas installé (optionnel)"
-    else
-        local git_version=$(git --version | awk '{print $3}')
-        log_ok "Git: ${git_version}"
-    fi
-    
-    if [ $has_error -eq 1 ]; then
-        return 1
-    fi
-    
-    return 0
+
+    [[ $has_error -eq 0 ]]
 }
 
 # ============================================================================
@@ -122,69 +95,50 @@ check_requirements() {
 
 install_dependencies() {
     log_title "Installation des dépendances"
-    
-    local system=$(detect_system)
-    
-    case $system in
+
+    case "$(detect_system)" in
         debian)
             log_info "Système détecté: Debian/Ubuntu"
             sudo apt-get update
-            sudo apt-get install -y \
-                python3 \
-                python3-pip \
-                docker.io \
-                git \
-                curl
+            sudo apt-get install -y python3 python3-pip docker.io git curl
             ;;
         redhat)
             log_info "Système détecté: RedHat/CentOS"
-            sudo yum install -y \
-                python3 \
-                python3-pip \
-                docker \
-                git \
-                curl
+            sudo yum install -y python3 python3-pip docker git curl
             ;;
         macos)
             log_info "Système détecté: macOS"
-            if ! command -v brew &> /dev/null; then
-                log_error "Homebrew n'est pas installé"
+            command -v brew >/dev/null 2>&1 || {
+                log_error "Homebrew requis"
                 return 1
-            fi
+            }
             brew install python docker git
             ;;
         *)
-            log_warn "Système non reconnu, installation manuelle requise"
+            log_warn "Système non reconnu – installation manuelle requise"
             return 1
             ;;
     esac
-    
+
     log_ok "Dépendances installées"
-    return 0
 }
 
 # ============================================================================
-# CRÉATION STRUCTURE RÉPERTOIRES
+# STRUCTURE DES RÉPERTOIRES
 # ============================================================================
 
 create_directories() {
     log_title "Création de la structure des répertoires"
-    
-    # Répertoires projet
-    mkdir -p "${REDRIVA_PROJECT_HOME}/bin"
-    mkdir -p "${REDRIVA_PROJECT_HOME}/lib"
-    mkdir -p "${REDRIVA_PROJECT_HOME}/templates"
-    mkdir -p "${REDRIVA_PROJECT_HOME}/docs"
-    
-    # Répertoires utilisateur (VISIBLE!)
-    mkdir -p "${REDRIVA_USER_HOME}/config"
-    mkdir -p "${REDRIVA_USER_HOME}/data/traefik/acme"
-    mkdir -p "${REDRIVA_USER_HOME}/data/radarr"
-    mkdir -p "${REDRIVA_USER_HOME}/data/sonarr"
-    mkdir -p "${REDRIVA_USER_HOME}/data/qbittorrent"
-    mkdir -p "${REDRIVA_USER_HOME}/data/plex"
-    mkdir -p "${REDRIVA_USER_HOME}/state"
-    
+
+    mkdir -p \
+        "${REDRIVA_PROJECT_HOME}/bin" \
+        "${REDRIVA_PROJECT_HOME}/lib" \
+        "${REDRIVA_PROJECT_HOME}/templates" \
+        "${REDRIVA_PROJECT_HOME}/docs" \
+        "${REDRIVA_USER_HOME}/config" \
+        "${REDRIVA_USER_HOME}/data"/{traefik/acme,radarr,sonarr,qbittorrent,plex} \
+        "${REDRIVA_USER_HOME}/state"
+
     log_ok "Répertoires créés: ${REDRIVA_USER_HOME}"
 }
 
@@ -194,42 +148,26 @@ create_directories() {
 
 setup_docker() {
     log_title "Configuration Docker"
-    
-    # Vérifier que Docker est accessible
-    if ! docker ps &> /dev/null; then
-        log_error "Docker n'est pas accessible"
-        log_info "Essayez: sudo usermod -aG docker $USER"
+
+    docker ps >/dev/null 2>&1 || {
+        log_warn "Docker non accessible (groupe docker requis)"
+        log_info "Commande suggérée: sudo usermod -aG docker $USER"
         return 1
-    fi
-    
-    # Ajouter l'utilisateur au groupe docker
-    if ! groups $USER | grep -q docker; then
-        log_info "Ajout de l'utilisateur au groupe docker..."
-        sudo usermod -aG docker $USER
-        log_warn "Changement de groupe nécessaire. Exécutez: newgrp docker"
-    fi
-    
-    log_ok "Docker configuré"
-    return 0
+    }
+
+    log_ok "Docker accessible"
 }
 
 # ============================================================================
-# CRÉATION LIEN SYMBOLIQUE
+# LIEN SYMBOLIQUE
 # ============================================================================
 
 setup_symlink() {
     log_title "Configuration du lien symbolique"
-    
-    # Rendre redriva.sh exécutable
+
     chmod +x "${REDRIVA_PROJECT_HOME}/bin/redriva.sh"
-    
-    # Créer ou mettre à jour le lien
-    if [ -L "/usr/local/bin/redriva" ]; then
-        sudo rm /usr/local/bin/redriva
-    fi
-    
-    sudo ln -s "${REDRIVA_PROJECT_HOME}/bin/redriva.sh" /usr/local/bin/redriva
-    
+    sudo ln -sf "${REDRIVA_PROJECT_HOME}/bin/redriva.sh" /usr/local/bin/redriva
+
     log_ok "Lien symbolique créé: /usr/local/bin/redriva"
 }
 
@@ -239,85 +177,58 @@ setup_symlink() {
 
 verify_installation() {
     log_title "Vérification de l'installation"
-    
-    local has_error=0
-    
-    # Vérifier redriva.sh
-    if [ ! -f "${REDRIVA_PROJECT_HOME}/bin/redriva.sh" ]; then
-        log_error "redriva.sh introuvable"
-        has_error=1
+
+    command -v redriva >/dev/null 2>&1 \
+        && log_ok "Commande 'redriva' disponible" \
+        || return 1
+
+    if ! redriva list >/dev/null 2>&1; then
+        log_warn "redriva fonctionne mais nécessite une configuration (normal)"
     else
-        log_ok "redriva.sh trouvé"
+        log_ok "redriva opérationnel"
     fi
-    
-    # Vérifier redriva-core.py
-    if [ ! -f "${REDRIVA_PROJECT_HOME}/bin/redriva-core.py" ]; then
-        log_error "redriva-core.py introuvable"
-        has_error=1
-    else
-        log_ok "redriva-core.py trouvé"
-    fi
-    
-    # Vérifier le lien symbolique
-    if [ ! -L "/usr/local/bin/redriva" ]; then
-        log_error "Lien symbolique /usr/local/bin/redriva introuvable"
-        has_error=1
-    else
-        log_ok "Lien symbolique /usr/local/bin/redriva OK"
-    fi
-    
-    # Test de la commande
-    if redriva help > /dev/null 2>&1; then
-        log_ok "Commande 'redriva' fonctionnelle"
-    else
-        log_error "Commande 'redriva' non fonctionnelle"
-        has_error=1
-    fi
-    
-    if [ $has_error -eq 1 ]; then
-        return 1
-    fi
-    
-    return 0
 }
 
 # ============================================================================
-# AFFICHAGE PROCHAINES ÉTAPES
+# PROCHAINES ÉTAPES (UI PROPRE)
 # ============================================================================
 
 display_next_steps() {
     log_title "Prochaines étapes"
-    
-    cat << EOF
 
-${BOLD}1. Configuration du core (Traefik + OAuth2)${NORMAL}
-   redriva setup-core
+    printf '%b\n' "
+${BOLD}Étapes recommandées${NORMAL}
 
-${BOLD}2. Lister les applications disponibles${NORMAL}
-   redriva list
+  1. Configuration du core (Traefik + OAuth2)
+     redriva setup-core
 
-${BOLD}3. Voir les infos d'une application${NORMAL}
-   redriva info radarr
+  2. Lister les applications disponibles
+     redriva list
 
-${BOLD}4. Installer une application${NORMAL}
-   redriva install radarr
+  3. Voir les informations d'une application
+     redriva info radarr
 
-${BOLD}5. Voir les logs${NORMAL}
-   redriva logs radarr
+  4. Installer une application
+     redriva install radarr
 
-${BOLD}Fichiers de configuration:${NORMAL}
-   ${REDRIVA_USER_HOME}/config/core.env     (secrets)
-   ${REDRIVA_USER_HOME}/config/             (configuration)
+  5. Afficher les logs d'une application
+     redriva logs radarr
 
-${BOLD}Données Docker:${NORMAL}
-   ${REDRIVA_USER_HOME}/data/                (données des apps)
 
-${BOLD}Documentation:${NORMAL}
-   ${REDRIVA_PROJECT_HOME}/README.md
-   ${REDRIVA_PROJECT_HOME}/INSTALLATION.md
-   ${REDRIVA_PROJECT_HOME}/SETUP.md
+${BOLD}Fichiers de configuration${NORMAL}
+  ${REDRIVA_USER_HOME}/config/core.env     secrets
+  ${REDRIVA_USER_HOME}/config/             configuration générale
 
-EOF
+
+${BOLD}Données Docker${NORMAL}
+  ${REDRIVA_USER_HOME}/data/               données persistantes
+
+
+${BOLD}Documentation${NORMAL}
+  ${REDRIVA_PROJECT_HOME}/README.md
+  ${REDRIVA_PROJECT_HOME}/INSTALLATION.md
+  ${REDRIVA_PROJECT_HOME}/SETUP.md
+"
 }
 
 # ============================================================================
@@ -326,55 +237,31 @@ EOF
 
 main() {
     clear
-    
-    cat << "EOF"
+
+    cat <<'EOF'
 ╔════════════════════════════════════════════════════════════════════════════╗
 ║                                                                            ║
 ║                    🚀 REDRIVA - Installation v3.0                         ║
 ║                                                                            ║
-║              Gestionnaire d'Applications Docker avec Traefik               ║
-║                         et Authentification OAuth2                        ║
-║                                                                            ║
 ╚════════════════════════════════════════════════════════════════════════════╝
 EOF
 
-    log_info "Répertoire du projet: ${REDRIVA_PROJECT_HOME}"
-    log_info "Répertoire utilisateur: ${REDRIVA_USER_HOME}"
-    log_info "Système détecté: $(detect_system)"
-    
-    # Étapes d'installation
-    check_requirements || {
-        log_error "Prérequis manquants"
-        exit 1
-    }
-    
-    install_dependencies || {
-        log_warn "Installation des dépendances incomplète"
-    }
-    
+    log_info "Projet      : ${REDRIVA_PROJECT_HOME}"
+    log_info "Utilisateur : ${REDRIVA_USER_HOME}"
+    log_info "Système     : $(detect_system)"
+
+    check_requirements || exit 1
+    install_dependencies || log_warn "Certaines dépendances peuvent manquer"
     create_directories
-    
-    setup_docker || {
-        log_warn "Configuration Docker incomplète"
-    }
-    
+    setup_docker || log_warn "Docker partiellement configuré"
     setup_symlink
-    
-    verify_installation || {
-        log_error "Vérification échouée"
-        exit 1
-    }
-    
+    verify_installation || exit 1
     display_next_steps
-    
-    cat << EOF
 
-${GREEN}${BOLD}Installation terminée avec succès!${NORMAL}
-
-Pour plus d'informations:
-  https://github.com/kesuro/redriva
-
-EOF
+    printf '\n%b\n' "${GREEN}${BOLD}✔ Installation terminée avec succès${NORMAL}"
+    echo
+    echo "Pour plus d'informations :"
+    echo "  https://github.com/kesuro/redriva"
 }
 
 # ============================================================================

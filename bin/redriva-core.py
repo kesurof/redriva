@@ -331,6 +331,61 @@ class AppManager:
         for name, info in AppRegistry.list_apps().items():
             icon = info.get('icon', '•')
             Logger.bullet(f"{Colors.BOLD}{icon} {name}{Colors.END} - {info['description']}")
+        
+    @staticmethod
+    def setup_core_command() -> None:
+        """
+        Commande: setup-core
+        Initialise la configuration du core (Traefik, OAuth2)
+        """
+        Logger.title("Configuration du core Redriva")
+
+        # Initialisation des répertoires
+        if not Initializer.init_directories():
+            sys.exit(1)
+
+        # Création du fichier core.env s’il n’existe pas
+        if Paths.CORE_ENV.exists():
+            Logger.warn("Le fichier core.env existe déjà")
+            Logger.info(f"Chemin: {Paths.CORE_ENV}")
+            return
+
+        try:
+            Paths.CORE_ENV.parent.mkdir(parents=True, exist_ok=True)
+
+            template = """# ============================================================================
+    # REDRIVA - Core configuration
+    # Traefik + OAuth2
+    # ============================================================================
+
+    # Identité utilisateur Docker
+    PUID=1000
+    PGID=1000
+    TZ=Europe/Paris
+
+    # Domaine principal
+    DOMAIN=example.com
+
+    # OAuth2 (ex: Authelia, Authentik, etc.)
+    OAUTH_PROVIDER=
+    OAUTH_CLIENT_ID=
+    OAUTH_CLIENT_SECRET=
+
+    # Traefik
+    TRAEFIK_EMAIL=admin@example.com
+    """
+
+            with open(Paths.CORE_ENV, "w") as f:
+                f.write(template)
+
+            Logger.ok("Fichier core.env créé")
+            Logger.info("Veuillez l’éditer avant d’installer des applications")
+            Logger.info(f"Édition: nano {Paths.CORE_ENV}")
+
+        except Exception as e:
+            Logger.error(f"Erreur lors de la création de core.env: {e}")
+            sys.exit(1)
+
     
     @staticmethod
     def info_command(app_name: str) -> None:
@@ -455,6 +510,8 @@ def main() -> None:
             AppManager.logs_command(sys.argv[2])
         elif command == "help":
             AppManager.help_command()
+        elif command == "setup-core":
+            AppManager.setup_core_command()
         else:
             Logger.error(f"Commande inconnue: {command}")
             AppManager.help_command()
