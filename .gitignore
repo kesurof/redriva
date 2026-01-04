@@ -1,0 +1,196 @@
+# Redriva - Git Ignore Configuration
+# Ignore les fichiers sensitifs et locaux
+
+# ============================================================================
+# CONFIGURATION UTILISATEUR - NE JAMAIS COMMITTER
+# ============================================================================
+
+# Configuration du core (variables sensibles)
+.myredriva/
+config/
+state/
+data/
+
+# Fichier d'environnement avec secrets
+core.env
+.env
+*.env.local
+
+# Logs utilisateur
+*.log
+logs/
+
+# ============================================================================
+# PYTHON - Artifacts de compilation
+# ============================================================================
+
+# Bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distributions
+dist/
+build/
+*.egg-info/
+*.egg
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ============================================================================
+# DOCKER - Artifacts
+# ============================================================================
+
+# Images locales (ne pas committer)
+docker-compose.override.yml
+
+# Volumes montés
+volumes/
+data/
+
+# ============================================================================
+# SYSTÈME - Fichiers spécifiques à l'OS
+# ============================================================================
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Linux
+.directory
+.Trash-*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+desktop.ini
+
+# ============================================================================
+# EDITEURS - Fichiers d'édition
+# ============================================================================
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# JetBrains (IntelliJ, PyCharm, etc.)
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+*.vim
+.vim/
+
+# Emacs
+*~
+\#*\#
+.\#*
+
+# ============================================================================
+# TEMPORAIRES
+# ============================================================================
+
+# Fichiers temporaires
+tmp/
+temp/
+*.tmp
+*.temp
+
+# Cache
+.cache/
+*.cache
+
+# ============================================================================
+# DOCUMENTATION - Fichiers générés
+# ============================================================================
+
+# Sphinx
+docs/_build/
+site/
+
+# ============================================================================
+# BACKUPS
+# ============================================================================
+
+*.bak
+*.backup
+*.orig
+
+# ============================================================================
+# SPÉCIFIQUE À REDRIVA
+# ============================================================================
+
+# Compose générés
+compose-generated/
+
+# Templates rendus (à ignorer, générés dynamiquement)
+templates/*/rendered/
+
+# État d'installation temporaire
+.redriva-installing
+
+# Fichiers de lock Docker
+docker-compose.lock
+
+# ============================================================================
+# SÉCURITÉ - À IGNORER ABSOLUMENT
+# ============================================================================
+
+# Certificats SSL
+*.pem
+*.key
+*.crt
+*.cert
+
+# Clés SSH
+*.id_rsa
+*.id_dsa
+*_rsa
+*_dsa
+
+# Tokens d'API
+*_token*
+*_secret*
+*_password*
+
+# Fichiers de credentials
+.credentials
+.aws/
+.kube/
+kubeconfig
+
+# ============================================================================
+# FICHIERS À COMMITTER
+# ============================================================================
+
+# NE PAS IGNORER:
+!bin/
+!bin/redriva.sh
+!bin/redriva-core.py
+!bin/install.sh
+!lib/
+!templates/
+!docs/
+!README.md
+!INSTALLATION.md
+!ANALYSE-COMPLETE.md
+!.gitignore
+!LICENSE
