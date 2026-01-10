@@ -40,20 +40,44 @@ redriva_action() {
 #######################################
 
 redriva_menu() {
-  local menu="$MENUS_DIR/main.menu"
-  [[ ! -f "$menu" ]] && error "Menu principal manquant"
-
   while true; do
     clear
-    title "REDRIVA — Menu principal"
-    parse_menu "$menu"
-    read -rp "👉 Choix : " choice
+    title "REDRIVA"
 
+    redriva_group_actions
+
+    local i=1
+    declare -gA MENU_MAP=()
+
+    for domain in "${!ACTION_GROUPS[@]}"; do
+      echo ""
+      echo "[$domain]"
+
+      for action in ${ACTION_GROUPS[$domain]}; do
+        printf "  %s) %s\n" "$i" "$action"
+        MENU_MAP["$i"]="$action"
+        ((i++))
+      done
+    done
+
+    echo ""
+    echo "  0) Quitter"
+    echo ""
+
+    read -rp "👉 Choix : " choice
     [[ "$choice" == "0" ]] && exit 0
-    run_menu_choice "$choice" "$menu"
+
+    [[ -z "${MENU_MAP[$choice]}" ]] && {
+      error "Choix invalide"
+      pause
+      continue
+    }
+
+    redriva_action "${MENU_MAP[$choice]}"
     pause
   done
 }
+
 
 parse_menu() {
   local file="$1"
@@ -88,4 +112,19 @@ run_menu_choice() {
 
   [[ -z "$action" ]] && error "Choix invalide"
   redriva_action "$action"
+}
+
+redriva_scan_actions() {
+  find "$ACTIONS_DIR" -maxdepth 1 -type f -name "*.sh" \
+    | sort \
+    | sed 's|.*/||; s|\.sh$||'
+}
+
+redriva_group_actions() {
+  declare -gA ACTION_GROUPS=()
+
+  while read -r action; do
+    local domain="${action%%[._]*}"
+    ACTION_GROUPS["$domain"]+="$action "
+  done < <(redriva_scan_actions)
 }
