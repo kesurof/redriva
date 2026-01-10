@@ -1,0 +1,10 @@
+# REDRIVA - Menu principal
+
+[Core]
+core.test = Test REDRIVA
+
+[System]
+ssh.harden = Sécuriser SSH
+
+[Cloudflare]
+cloudflare.setup = Configurer DNS wildcard

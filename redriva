@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+set -e
+
+BASE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+source "$BASE_DIR/core/loader.sh"
+
+case "$1" in
+  menu|"")
+    redriva_menu
+    ;;
+  action)
+    shift
+    redriva_action "$@"
+    ;;
+  list)
+    redriva_list_actions
+    ;;
+  *)
+    echo "Usage:"
+    echo "  redriva menu"
+    echo "  redriva action <name>"
+    echo "  redriva list"
+    exit 1
+    ;;
+esac
