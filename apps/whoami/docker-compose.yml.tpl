@@ -10,6 +10,9 @@ services:
     labels:
       - "traefik.enable=true"
 
+      # IMPORTANT — réseau Docker utilisé par Traefik
+      - "traefik.docker.network=proxy"
+
       # Router
       - "traefik.http.routers.${APP_NAME}.rule=Host(`${APP_DOMAIN}`)"
       - "traefik.http.routers.${APP_NAME}.entrypoints=web,websecure"
