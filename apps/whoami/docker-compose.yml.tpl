@@ -1,11 +1,8 @@
 services:
-  whoami:
+  ${APP_NAME}:
     image: traefik/whoami
     container_name: ${APP_NAME}
     restart: unless-stopped
-
-    volumes:
-      - "${APP_DATA_DIR}/config:/config"
 
     networks:
       - proxy
@@ -14,13 +11,13 @@ services:
       - "traefik.enable=true"
       - "traefik.docker.network=proxy"
 
-      # Router
-      - "traefik.http.routers.${APP_NAME}.name=${APP_NAME}"
+      # Router (lié DIRECTEMENT à APP_NAME)
       - "traefik.http.routers.${APP_NAME}.rule=Host(`${APP_DOMAIN}`)"
       - "traefik.http.routers.${APP_NAME}.entrypoints=websecure"
       - "traefik.http.routers.${APP_NAME}.tls=true"
+      - "traefik.http.routers.${APP_NAME}.service=${APP_NAME}"
 
-      # Middleware (modifiable par REDRIVA)
+      # Middleware (remplacé dynamiquement)
       - "traefik.http.routers.${APP_NAME}.middlewares=auth-basic@file"
 
       # Service
