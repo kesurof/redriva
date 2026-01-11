@@ -17,8 +17,21 @@ BASE_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 source "$BASE_DIR/core/ui.sh"
 source "$BASE_DIR/core/config.sh"
 source "$BASE_DIR/modules/app_engine.sh"
+source "$BASE_DIR/modules/user_identity.sh"
 
 title "Applications — Déploiement"
+
+#######################################
+# Identité runtime (PUID / PGID)
+#######################################
+if ! user_identity_check; then
+  error "Identité runtime non configurée — exécute redriva_configure_identity"
+fi
+
+export PUID="$(user_identity_get_uid)"
+export PGID="$(user_identity_get_gid)"
+
+info "Identité runtime : UID=$PUID / GID=$PGID"
 
 #######################################
 # Liste des applications disponibles
@@ -73,7 +86,7 @@ export CF_DOMAIN
 APP_DOMAIN="$(render_domain "$APP_DEFAULT_DOMAIN")" \
   || error "Impossible de déterminer le domaine (CF_DOMAIN manquant)"
 
-info "Domaine par défaut : $DEFAULT_DOMAIN"
+info "Domaine par défaut : $APP_DOMAIN"
 read -rp "👉 Modifier le domaine ? [y/N] : " change_domain
 
 if [[ "$change_domain" =~ ^[yY]$ ]]; then
