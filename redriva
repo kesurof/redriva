@@ -1,10 +1,17 @@
 #!/usr/bin/env bash
 set -e
 
+# Auto-élévation root
+if [[ "$EUID" -ne 0 ]]; then
+  exec sudo "$0" "$@"
+fi
+
 BASE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Charger le core (fonctions uniquement)
 source "$BASE_DIR/core/loader.sh"
 
+# Dispatch des commandes
 case "$1" in
   menu|"")
     redriva_menu
