@@ -94,6 +94,33 @@ if [[ "$change_domain" =~ ^[yY]$ ]]; then
 fi
 
 #######################################
+# Choix du type d'authentification
+#######################################
+echo ""
+echo "Type d'authentification pour l'application :"
+echo ""
+echo "  1) Aucune"
+echo "  2) Auth Traefik (Basic)"
+echo ""
+
+read -rp "👉 Choix [1-2] (défaut: 1) : " auth_choice
+auth_choice="${auth_choice:-1}"
+
+case "$auth_choice" in
+  1)
+    APP_AUTH_TYPE="none"
+    ;;
+  2)
+    APP_AUTH_TYPE="traefik_basic"
+    ;;
+  *)
+    error "Choix d'authentification invalide"
+    ;;
+esac
+
+info "Authentification sélectionnée : $APP_AUTH_TYPE"
+
+#######################################
 # Résumé avant action
 #######################################
 
@@ -104,6 +131,7 @@ echo "Résumé du déploiement :"
 echo " - Application : $APP_NAME"
 echo " - Domaine     : $APP_DOMAIN"
 echo " - Dossier     : $TARGET_DIR"
+echo " - Auth        : $APP_AUTH_TYPE"
 echo ""
 
 read -rp "❓ Confirmer le déploiement ? [y/N] : " confirm
@@ -129,6 +157,17 @@ info "Déploiement Docker de l'application…"
   cd "$TARGET_DIR"
   docker compose up -d
 )
+
+#######################################
+# Post-déploiement : Authentification
+#######################################
+if [[ "$APP_AUTH_TYPE" == "traefik_basic" ]]; then
+  echo ""
+  info "Authentification Traefik demandée"
+  info "Étapes requises :"
+  echo "  1) Vérifie que l'auth Traefik est déployée : traefik_auth_check"
+  echo "  2) Applique l'auth à l'application : app_auth_apply"
+fi
 
 success "Application '$APP_NAME' déployée avec succès"
 info "URL attendue : https://$APP_DOMAIN"
