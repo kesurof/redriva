@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Action REDRIVA — Vérification Auth Application
+# Action REDRIVA — Vérification Auth Traefik
 
 set -e
 
@@ -11,51 +11,41 @@ source "$BASE_DIR/modules/app_engine.sh"
 
 title "Application — Vérification Auth"
 
-#######################################
-# Sélection app
-#######################################
-mapfile -t APPS < <(app_list)
-[[ "${#APPS[@]}" -eq 0 ]] && error "Aucune application disponible"
-
-i=1
-for app in "${APPS[@]}"; do
-  unset APP_NAME APP_DESCRIPTION
-  app_load_conf "$app" || continue
-  printf " %2d) %-15s — %s\n" "$i" "$APP_NAME" "$APP_DESCRIPTION"
-  ((i++))
-done
-
-read -rp "👉 Choix de l'application : " choice
-(( choice < 1 || choice > ${#APPS[@]} )) && error "Choix invalide"
-
-APP_SELECTED="${APPS[$((choice - 1))]}"
-app_load_conf "$APP_SELECTED"
-
-TARGET_DIR="$(app_target_dir "$APP_SELECTED")"
-COMPOSE_FILE="$TARGET_DIR/docker-compose.yml"
+APP_SELECTED="${1:-}"
 
 #######################################
-# Vérification middleware
+# Sélection application
 #######################################
-info "Vérification middleware auth…"
-
-if grep -q 'middlewares=.*auth' "$COMPOSE_FILE"; then
-  success "Middleware auth détecté"
+if [[ -n "$APP_SELECTED" ]]; then
+  app_load_conf "$APP_SELECTED" || error "Application invalide"
 else
-  error "Aucun middleware auth appliqué à l'application"
+  mapfile -t APPS < <(app_list)
+  [[ "${#APPS[@]}" -eq 0 ]] && error "Aucune application disponible"
+
+  echo "Applications disponibles :"
+  echo ""
+
+  i=1
+  for app in "${APPS[@]}"; do
+    unset APP_NAME APP_DESCRIPTION
+    app_load_conf "$app" || continue
+    printf " %2d) %-15s — %s\n" "$i" "$APP_NAME" "$APP_DESCRIPTION"
+    ((i++))
+  done
+
+  echo ""
+  read -rp "👉 Choix de l'application : " choice
+  (( choice < 1 || choice > ${#APPS[@]} )) && error "Choix invalide"
+
+  APP_SELECTED="${APPS[$((choice - 1))]}"
+  app_load_conf "$APP_SELECTED"
 fi
 
 #######################################
-# Test HTTP
+# Vérification
 #######################################
-APP_DOMAIN="$(render_domain "$APP_DEFAULT_DOMAIN")"
-
-info "Test HTTPS (sans auth) : https://$APP_DOMAIN"
-
-CODE="$(curl -sk -o /dev/null -w "%{http_code}" "https://$APP_DOMAIN")"
-
-if [[ "$CODE" == "401" || "$CODE" == "403" ]]; then
-  success "Accès protégé (HTTP $CODE)"
+if app_traefik_has_middleware "$APP_SELECTED" "auth-basic@file"; then
+  success "Auth Traefik activée pour $APP_NAME"
 else
-  error "Application accessible sans auth (HTTP $CODE)"
+  info "Aucune authentification active pour $APP_NAME"
 fi
