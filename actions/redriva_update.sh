@@ -91,6 +91,22 @@ read -rp "❓ Appliquer la mise à jour maintenant ? [y/N] : " confirm
 info "Application de la mise à jour…"
 git pull --ff-only origin main
 
+#######################################
+# Normalisation des permissions
+#######################################
+
+info "Normalisation des permissions REDRIVA…"
+
+# Actions exécutables
+find "$BASE_DIR/actions" -type f -exec chmod 755 {} \;
+
+# Modules et core en lecture seule
+find "$BASE_DIR/modules" -type f -exec chmod 644 {} \;
+find "$BASE_DIR/core" -type f -exec chmod 644 {} \;
+find "$BASE_DIR/menus" -type f -exec chmod 644 {} \;
+
+success "Permissions normalisées"
+
 NEW_COMMIT="$(git rev-parse --short HEAD)"
 success "REDRIVA mis à jour avec succès"
 info "Nouveau commit : $NEW_COMMIT"
