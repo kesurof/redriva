@@ -70,9 +70,8 @@ CF_DOMAIN="$(config_get CF_DOMAIN)"
 [[ -z "$CF_DOMAIN" ]] && error "CF_DOMAIN non défini — configure Cloudflare d’abord"
 export CF_DOMAIN
 
-DEFAULT_DOMAIN="$(echo "$APP_DEFAULT_DOMAIN" | envsubst)"
-
-APP_DOMAIN="$DEFAULT_DOMAIN"
+APP_DOMAIN="$(render_domain "$APP_DEFAULT_DOMAIN")" \
+  || error "Impossible de déterminer le domaine (CF_DOMAIN manquant)"
 
 info "Domaine par défaut : $DEFAULT_DOMAIN"
 read -rp "👉 Modifier le domaine ? [y/N] : " change_domain
