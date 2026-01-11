@@ -92,7 +92,7 @@ info "Application de la mise à jour…"
 git pull --ff-only origin main
 
 #######################################
-# Normalisation des permissions
+# Normalisation des permissions après git pull
 #######################################
 
 info "Normalisation des permissions REDRIVA…"
