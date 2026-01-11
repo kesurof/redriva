@@ -16,11 +16,11 @@ app_traefik_apply_middleware() {
 
   [[ -f "$compose" ]] || return 1
 
-  # Ajoute ou remplace le label middleware
   sed -i -E \
-    "s|(traefik.http.routers.[^.]+.middlewares=).*|\1$middleware|" \
+    "s|(traefik.http.routers.[^.]+.middlewares=)[^\"]*\"|\1$middleware\"|" \
     "$compose"
 }
+
 
 #######################################
 # Supprimer un middleware Traefik
