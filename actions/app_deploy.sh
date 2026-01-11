@@ -114,6 +114,14 @@ read -rp "❓ Confirmer le déploiement ? [y/N] : " confirm
 #######################################
 export APP_DOMAIN
 info "Préparation des fichiers…"
+if [[ -f "$TARGET_DIR/docker-compose.yml" ]]; then
+  echo "⚠️  docker-compose.yml déjà présent pour cette application"
+  read -rp "👉 Remplacer le fichier docker-compose.yml ? [y/N] : " r
+  [[ "$r" =~ ^[yY]$ ]] || {
+    info "Déploiement annulé (docker-compose.yml conservé)"
+    exit 0
+  }
+fi
 app_prepare "$APP_SELECTED"
 
 info "Déploiement Docker…"

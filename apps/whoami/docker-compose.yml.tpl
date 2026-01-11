@@ -4,6 +4,9 @@ services:
     container_name: ${APP_NAME}
     restart: unless-stopped
 
+    volumes:
+      - "${APP_DATA_DIR}/config:/config"
+
     networks:
       - proxy
 

@@ -16,7 +16,8 @@
 #######################################
 
 APP_TEMPLATES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../apps" && pwd)"
-APP_TARGET_BASE="/opt/docker"
+APP_INSTALL_BASE="/opt/docker/config"
+APP_DATA_BASE="/opt/docker/apps"
 
 #######################################
 # Liste des applications disponibles
@@ -52,7 +53,7 @@ app_load_conf() {
 #######################################
 app_target_dir() {
   local app="$1"
-  echo "$APP_TARGET_BASE/$app"
+  echo "$APP_INSTALL_BASE/$app"
 }
 
 #######################################
@@ -66,8 +67,6 @@ app_copy_templates() {
   local target="$2"
   local src="$APP_TEMPLATES_DIR/$app"
 
-  # Nettoyage pour garantir un état déterministe
-  rm -rf "$target"
   mkdir -p "$target"
 
   # Copie brute (tpl + autres fichiers éventuels)
@@ -106,6 +105,8 @@ app_prepare() {
   # Export minimal requis pour envsubst
   export APP_NAME
   export APP_DOMAIN
+
+  export APP_DATA_DIR="$APP_DATA_BASE/$app"
 
   # Copie + substitution
   app_copy_templates "$app" "$target"
