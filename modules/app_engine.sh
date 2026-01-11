@@ -111,3 +111,13 @@ app_prepare() {
   app_copy_templates "$app" "$target"
   app_apply_templates "$target"
 }
+
+render_domain() {
+  local template="$1"
+  local cf_domain
+
+  cf_domain="$(config_get CF_DOMAIN)"
+  [[ -z "$cf_domain" ]] && return 1
+
+  echo "$template" | sed "s/{{CF_DOMAIN}}/$cf_domain/g"
+}

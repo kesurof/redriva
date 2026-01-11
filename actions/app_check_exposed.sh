@@ -52,10 +52,8 @@ APP_SELECTED="${APPS[$((choice - 1))]}"
 unset APP_NAME APP_DESCRIPTION APP_DEFAULT_DOMAIN APP_DOMAIN
 app_load_conf "$APP_SELECTED" || error "Impossible de charger la configuration de l'application"
 
-CF_DOMAIN="$(config_get CF_DOMAIN)"
-[[ -z "$CF_DOMAIN" ]] && error "CF_DOMAIN non défini — Cloudflare non configuré"
-
-APP_DOMAIN="$(echo "$APP_DEFAULT_DOMAIN" | envsubst)"
+APP_DOMAIN="$(render_domain "$APP_DEFAULT_DOMAIN")" \
+  || error "Impossible de déterminer le domaine (CF_DOMAIN manquant)"
 
 TARGET_DIR="$(app_target_dir "$APP_SELECTED")"
 CONTAINER_NAME="$APP_NAME"
