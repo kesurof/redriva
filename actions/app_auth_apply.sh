@@ -10,6 +10,7 @@ BASE_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 source "$BASE_DIR/core/ui.sh"
 source "$BASE_DIR/core/config.sh"
 source "$BASE_DIR/modules/app_engine.sh"
+source "$BASE_DIR/modules/app_traefik.sh"
 
 title "Application — Activation Auth Traefik"
 
