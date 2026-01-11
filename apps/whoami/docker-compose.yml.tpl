@@ -20,7 +20,7 @@ services:
       # Router Traefik
       # ==================================================
       - "traefik.http.routers.${APP_NAME}.rule=Host(`${APP_DOMAIN}`)"
-      - "traefik.http.routers.${APP_NAME}.entrypoints=web,websecure"
+      - "traefik.http.routers.${APP_NAME}.entrypoints=websecure"
       - "traefik.http.routers.${APP_NAME}.tls=true"
 
       # ==================================================
