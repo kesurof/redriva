@@ -33,6 +33,7 @@ services:
       # (ex: auth-basic@file) sans jamais la créer.
       # ==================================================
       - "traefik.http.routers.${APP_NAME}.middlewares="
+      - "traefik.http.routers.${APP_NAME}.service=${APP_NAME}"
 
       # ==================================================
       # Service Traefik
