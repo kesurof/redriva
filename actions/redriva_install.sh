@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Action REDRIVA — Installation système de REDRIVA
+# Action REDRIVA — Installation système de REDRIVA (via Git)
 #
-# - Installe le projet REDRIVA dans /opt/redriva
+# - Clone REDRIVA dans /opt/redriva
+# - Branche de référence : main
 # - Installe le lanceur système /usr/local/bin/redriva
-# - Sépare strictement outil / données hôte
 #
-# ⚠️ Action effectrice, rejouable, explicite
+# ⚠️ Action effectrice, explicite, rejouable
 
 set -e
 
@@ -14,18 +14,34 @@ BASE_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 source "$BASE_DIR/core/ui.sh"
 
-title "REDRIVA — Installation système"
+title "REDRIVA — Installation système (Git)"
 
 INSTALL_DIR="/opt/redriva"
 LAUNCHER="/usr/local/bin/redriva"
+BRANCH="main"
+
+#######################################
+# Détection de l’URL Git
+#######################################
+
+if [[ ! -d "$BASE_DIR/.git" ]]; then
+  error "Le projet courant n’est pas un dépôt Git"
+  info "Impossible de déterminer l’URL distante"
+  exit 1
+fi
+
+GIT_URL="$(git -C "$BASE_DIR" remote get-url origin)"
+
+info "Dépôt Git : $GIT_URL"
+info "Branche   : $BRANCH"
+info "Cible     : $INSTALL_DIR"
 
 echo ""
 echo "⚠️  ACTION EFFECTRICE"
 echo "Cette action va :"
-echo " - installer REDRIVA dans : $INSTALL_DIR"
-echo " - installer le lanceur : $LAUNCHER"
-echo ""
-echo "Aucune donnée applicative (/opt/docker) ne sera modifiée."
+echo " - installer REDRIVA dans $INSTALL_DIR via git"
+echo " - installer le lanceur système $LAUNCHER"
+echo " - ne PAS toucher aux applications ni aux données hôte"
 echo ""
 
 read -rp "❓ Continuer l'installation de REDRIVA ? [y/N] : " confirm
@@ -35,16 +51,35 @@ read -rp "❓ Continuer l'installation de REDRIVA ? [y/N] : " confirm
 }
 
 #######################################
-# Installation du projet REDRIVA
+# Installation / mise à jour du dépôt
 #######################################
 
-info "Installation du projet REDRIVA dans $INSTALL_DIR…"
+if [[ -d "$INSTALL_DIR/.git" ]]; then
+  info "REDRIVA déjà installé via Git — mise à jour du dépôt…"
+  cd "$INSTALL_DIR"
+  git fetch origin "$BRANCH"
+  git checkout "$BRANCH"
+  git pull --ff-only origin "$BRANCH"
 
-rm -rf "$INSTALL_DIR"
-mkdir -p "$INSTALL_DIR"
-cp -a "$BASE_DIR/"* "$INSTALL_DIR/"
+elif [[ -d "$INSTALL_DIR" ]]; then
+  echo ""
+  info "⚠️  Le dossier $INSTALL_DIR existe mais n’est pas un dépôt Git"
+  info "Une installation propre est nécessaire pour activer les mises à jour"
 
-success "Projet installé dans $INSTALL_DIR"
+  read -rp "❓ Supprimer $INSTALL_DIR et réinstaller REDRIVA via Git ? [y/N] : " wipe
+  [[ "$wipe" =~ ^[yY]$ ]] || {
+    info "Installation annulée"
+    exit 0
+  }
+
+  rm -rf "$INSTALL_DIR"
+  info "Installation initiale de REDRIVA…"
+  git clone --branch "$BRANCH" "$GIT_URL" "$INSTALL_DIR"
+
+else
+  info "Installation initiale de REDRIVA…"
+  git clone --branch "$BRANCH" "$GIT_URL" "$INSTALL_DIR"
+fi
 
 #######################################
 # Installation du lanceur système
@@ -93,5 +128,5 @@ chmod 755 "$LAUNCHER"
 success "Lanceur installé : $LAUNCHER"
 
 echo ""
-success "REDRIVA est maintenant installé comme outil système"
+success "REDRIVA est maintenant installé via Git"
 info "Utilisation : redriva menu"

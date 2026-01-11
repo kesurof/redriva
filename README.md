@@ -1,197 +1,155 @@
-Parfait.
-Voici un **README fondateur**, volontairement **clair, sobre et structurant**, qui pose l’identité de **REDRIVA** pour les années à venir.
-Tu peux le poser tel quel comme `README.md` à la racine du repo.
-
----
-
 # REDRIVA
 
-**REDRIVA** est un **orchestrateur d’actions d’administration serveur**, modulaire, relançable et maintenable dans le temps.
+REDRIVA est un **outil d’administration serveur** pensé pour la vraie vie :
+serveurs qui durent, configurations qui évoluent, admins fatigués à 23h.
 
-Il permet de **configurer, maintenir et faire évoluer un serveur Linux** à travers des **actions unitaires**, exécutables à la demande, sans dépendre d’un parcours figé ou d’un script monolithique.
+Ce n’est **pas** un script d’installation jetable.
+Ce n’est **pas** un framework magique.
 
----
-
-## 🎯 Objectifs du projet
-
-REDRIVA vise à :
-
-* Administrer un serveur **dans la durée**, pas uniquement à l’installation
-* Remplacer les scripts “one-shot” par des **actions rejouables**
-* Centraliser la configuration système, réseau et applicative
-* Réduire la dette technique et l’effet “script oublié”
-* Offrir une **interface simple** (menu) pour l’exploitation quotidienne
+REDRIVA est un **orchestrateur d’actions** : clair, relançable, maintenable.
 
 ---
 
-## 🧠 Philosophie
+## ✨ Pourquoi REDRIVA ?
 
-### REDRIVA n’est PAS
+Avec le temps, les serveurs accumulent :
+- des scripts oubliés
+- des commandes copiées/collées
+- des procédures non documentées
 
-* Un script d’installation jetable
-* Un bootstrap linéaire
-* Un framework opaque ou magique
-* Un outil figé dans un état initial
+REDRIVA apporte une réponse simple :
 
-### REDRIVA EST
+> **Tout ce qui est fait sur le serveur doit être rejouable, lisible et explicite.**
 
-* Un **socle d’actions unitaires**
-* Un outil **toujours relançable**
-* Une base **lisible, explicite et auditable**
-* Un projet orienté **maintenance long terme**
-* Un **orchestrateur**, pas un remplaçant à Docker, systemd ou Ansible
+Une action = une responsabilité.
 
 ---
 
-## 🧩 Concept clé : l’action
+## 🧱 Philosophie
 
-Dans REDRIVA, **tout est une action**.
+- 🔁 **Rejouable** — une action peut être relancée sans casser l’existant
+- 📖 **Lisible** — pas besoin de connaître le projet pour l’utiliser
+- 🧠 **Prévisible** — aucun effet de bord implicite
+- 🛠️ **Maintenance > installation**
+- ❌ **Zéro magie**
 
-Une action :
-
-* Fait **une seule chose**
-* Peut être exécutée indépendamment
-* Peut être rejouée sans effet de bord
-* Ne dépend pas d’un “ordre global”
-
-Exemples :
-
-* Configurer un DNS Cloudflare
-* Sécuriser SSH
-* Déployer Traefik
-* Mettre à jour un outil interne
-* Recharger une configuration
+REDRIVA est conçu pour rester utilisable **dans plusieurs années**.
 
 ---
 
-## 🗂️ Architecture du projet
+## 📂 Architecture
 
-```text
-redriva/
-├── redriva               # CLI principal
-├── README.md
-│
-├── core/                 # Fondations (UI, config, checks)
-│
-├── modules/              # Logique métier par domaine
-│   ├── cloudflare/
-│   ├── ssh/
-│   ├── users/
-│   ├── docker/
-│   ├── traefik/
-│   └── redriva/
-│
-├── actions/              # Actions unitaires exécutables
-│
-├── menus/                # Menus déclaratifs
-│
-└── profiles/             # (optionnel) presets de serveur
+```
+/opt/redriva          → outil REDRIVA (code)
+/usr/local/bin/redriva → lanceur système
+/opt/docker/*         → applications & données hôte
 ```
 
-### Séparation stricte des responsabilités
-
-* **core/**
-  Fonctions fondamentales partagées (UI, config, validations)
-  - loader
-    👉 Charge le core
-    👉 Gère menus & actions
-    👉 Aucune logique métier
-
-* **modules/**
-  Logique métier pure, sans orchestration globale
-
-* **actions/**
-  Scripts courts, explicites, rejouables
-
-* **menus/**
-  Interface utilisateur déclarative (aucune logique)
+Les rôles sont volontairement séparés.
 
 ---
 
-## 🧭 Interface utilisateur
+## 🚀 Installation (serveur vierge)
 
-REDRIVA propose une interface simple :
+```bash
+git clone https://github.com/kesurof/redriva.git /opt/redriva
+cd /opt/redriva
+sudo ./redriva action redriva_install
+```
+
+Puis simplement :
 
 ```bash
 redriva menu
 ```
 
-Le menu :
+---
 
-* Liste les actions disponibles
-* Les classe par domaine
-* Permet d’exécuter une action sans connaître sa structure interne
+## 🔄 Mise à jour
 
-Aucune modification de code n’est nécessaire pour maintenir le menu.
+REDRIVA se met à jour **depuis lui-même**.
+
+```bash
+redriva action redriva_update
+```
+
+- pas de `git pull` manuel
+- pas de script externe
+- aucune application impactée
 
 ---
 
-## 🔐 Configuration persistante
+## 🧭 Utilisation quotidienne
 
-REDRIVA utilise une configuration persistante locale :
+### Menu interactif
 
-* Centralisée
-* Hors dépôt Git
-* Réutilisée automatiquement
-* Modifiable uniquement avec confirmation
+```bash
+redriva menu
+```
 
-Les secrets ne sont jamais affichés en clair.
+Le menu est généré automatiquement à partir des actions disponibles.
 
----
-
-## 🔁 Rejouabilité et sécurité
-
-* Les actions sont conçues pour être **idempotentes**
-* Aucune destruction sans confirmation explicite
-* Aucune dépendance implicite à un “ordre d’exécution”
-* Chaque action peut être relancée après une mise à jour, un incident ou un redémarrage serveur
+Ajouter une action = elle apparaît immédiatement.
 
 ---
 
-## 🛠️ Cas d’usage typiques
+### Exécuter une action
 
-* Installation initiale d’un serveur
-* Reconfiguration partielle (DNS, SSH, proxy)
-* Maintenance récurrente
-* Ajout progressif de services
-* Réparation après incident
-* Reprise sur serveur existant
+```bash
+redriva action <nom_action>
+```
 
----
+Exemples :
+- `ssh_check_keys`
+- `cloudflare_configure`
+- `app_deploy`
 
-## 📌 Principes directeurs
-
-* Simplicité > sophistication
-* Lisibilité > abstraction
-* Actions unitaires > scripts globaux
-* Maintenance > installation
-* Transparence totale
+Chaque action annonce clairement ce qu’elle va faire.
 
 ---
 
-## 🛣️ Évolutions prévues
+## 📦 Applications
 
-* Enrichissement progressif des modules
-* Menus contextuels
-* Profils de serveur optionnels
-* Outils de diagnostic
-* Vérifications de conformité
+- Les templates vivent dans `apps/`
+- Les applications sont déployées dans `/opt/docker/<app>`
+- REDRIVA ne mélange **jamais** outil et données
 
----
-
-## ⚠️ Note importante
-
-REDRIVA n’impose **aucune architecture applicative**.
-Il ne remplace ni Docker Compose, ni systemd, ni les outils standards du système.
-
-Il **orchestré ce qui existe**, sans le masquer.
+```bash
+redriva action app_deploy
+```
 
 ---
 
-## ✨ En résumé
+## 🔐 Sécurité & confiance
 
-REDRIVA est un outil pour les admins qui veulent :
+- REDRIVA s’exécute en root
+- le contrôle des privilèges est centralisé
+- aucune action cachée
+- aucune modification silencieuse
 
-> **reprendre le contrôle de leur serveur, aujourd’hui comme demain.**
+Si REDRIVA fait quelque chose, **tu le vois**.
 
 ---
+
+## 🧠 À qui s’adresse REDRIVA ?
+
+- admins système
+- auto-hébergeurs sérieux
+- environnements cloud long terme
+- personnes qui veulent **reprendre la main** sur leurs serveurs
+
+---
+
+## 🏁 En résumé
+
+REDRIVA est :
+- un outil d’administration durable
+- un socle de confiance
+- une alternative saine aux scripts jetables
+
+Si tu gères un serveur **dans la durée**, REDRIVA est fait pour toi.
+
+---
+
+👉 Documentation complète : voir le dossier `docs/` (ou le wiki GitHub)
+
